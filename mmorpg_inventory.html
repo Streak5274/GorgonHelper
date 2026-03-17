@@ -383,6 +383,8 @@ let activeVaultFilter = null;
 let showConsolidateOnly = false;
 
 // Game data (loaded from files)
+const APP_VERSION = '0.1.0';
+
 let ITEMS = {};           // id -> [name, maxStack]
 let RECIPES = {};         // internalName -> [name, skill, [[ingId,qty]...], [[resId,qty]...]]
 let ITEMUSES = {};        // id -> [recipeInternalName, ...]
@@ -392,6 +394,7 @@ let NPCS = {};            // npcKey -> {name, area, desc, services}
 let VAULTS = {};          // vaultKey -> {name, area, numSlots, levels, grouping, reqDesc}
 let QUESTS = {};          // internalName -> {name, loc, npc, npcName, objs:[{t,n,d?,tid?}]}
 let dataLoaded = { items: false, recipes: false, itemuses: false, sources_recipes: false, sources_items: false, npcs: false, vaults: false, quests: false };
+let dataVersions = {}; // key -> version string read from _version field
 
 // ═══════════════════════════════════════════════════════════
 // INDEXEDDB — single DB, multiple stores
@@ -703,6 +706,7 @@ function applyGameData(key, data) {
   if (key === 'npcs')            { NPCS = data; dataLoaded.npcs = true; }
   if (key === 'vaults')          { VAULTS = data; dataLoaded.vaults = true; }
   if (key === 'quests')          { QUESTS = data; dataLoaded.quests = true; }
+  if (data._version) dataVersions[key] = data._version;
   updateSettingsStatus();
 }
 
@@ -2981,6 +2985,19 @@ function renderSettingsTab() {
           <button class="ctx-btn danger" onclick="clearWOLimit('${k}')">Clear</button>
         </div>`).join('')
     }
+  </div>
+
+  <div class="settings-section" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px">
+    <div class="settings-title">Version</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
+      <span style="font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:3px 9px;color:var(--gold)">App v${APP_VERSION}</span>
+      ${DATA_FILES.map(df => dataVersions[df.key]
+        ? `<span style="font-size:11px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:2px 7px;color:var(--text-dim)" title="${df.file}">${df.label.replace(' Database','').replace(' Sources','').replace(' Database','')} v${dataVersions[df.key]}</span>`
+        : ''
+      ).filter(Boolean).join('')}
+    </div>
+  </div>
+
   </div></div>`;
 }
 
