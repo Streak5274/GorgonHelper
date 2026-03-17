@@ -520,6 +520,7 @@ let folderHandle = null;
 let autoRefreshInterval = null;
 let fileSnapshot = new Map();
 const POLL_INTERVAL = 5000;
+const CHAR_EXPORT_FOLDER = 'character_exports';
 
 async function saveFolderHandle(h)  { try { await dbPut('folder_handle','folder',h); } catch(e){} }
 async function loadFolderHandle()   { return dbGet('folder_handle','folder'); }
@@ -528,7 +529,7 @@ async function tryRestoreFolder() {
   const h = await loadFolderHandle();
   if (!h) return;
   try {
-    const perm = await h.queryPermission({ mode:'read' });
+    const perm = await h.queryPermission({ mode:'readwrite' });
     if (perm === 'granted') { await attachFolder(h); return; }
     showResumePrompt(h);
   } catch(e) {}
@@ -543,7 +544,7 @@ function showResumePrompt(h) {
 async function resumeFolder() {
   const h = window._pendingHandle;
   if (!h) return;
-  const perm = await h.requestPermission({ mode:'read' });
+  const perm = await h.requestPermission({ mode:'readwrite' });
   if (perm === 'granted') await attachFolder(h);
 }
 
@@ -567,7 +568,7 @@ async function attachFolder(h) {
 async function pickFolder() {
   if (!window.showDirectoryPicker) { showToast('Use Chrome or Edge for folder access'); return; }
   try {
-    const h = await window.showDirectoryPicker({ mode:'read' });
+    const h = await window.showDirectoryPicker({ mode:'readwrite' });
     await saveFolderHandle(h);
     await attachFolder(h);
   } catch(e) { if (e.name !== 'AbortError') showToast('Could not open folder: ' + e.message); }
@@ -596,8 +597,33 @@ function updateAutoStatus(state) {
   }
 }
 
+async function moveGameExports() {
+  if (!folderHandle) return;
+  try {
+    const exportFolder = await folderHandle.getDirectoryHandle(CHAR_EXPORT_FOLDER, { create: true });
+    for await (const [name, handle] of folderHandle.entries()) {
+      if (handle.kind !== 'file' || !name.endsWith('.json')) continue;
+      const isCharFile  = /^Character_.+\.json$/.test(name);
+      const isItemsFile = /^.+_items_.+Z\.json$/.test(name);
+      if (!isCharFile && !isItemsFile) continue;
+      try {
+        const file = await handle.getFile();
+        const dest = await exportFolder.getFileHandle(name, { create: true });
+        const writable = await dest.createWritable();
+        await writable.write(await file.arrayBuffer());
+        await writable.close();
+        await folderHandle.removeEntry(name);
+      } catch(e) {}
+    }
+  } catch(e) {} // no write access or other error — skip silently
+}
+
 async function scanFolder(isInitial) {
   if (!folderHandle) return;
+
+  // Move any game exports from root into character_exports/ subfolder
+  await moveGameExports();
+
   const jsonFiles = [];
   try {
     for await (const [name, handle] of folderHandle.entries()) {
@@ -607,6 +633,17 @@ async function scanFolder(isInitial) {
       }
     }
   } catch(e) { showToast('Folder read error: ' + e.message); return; }
+
+  // Also collect character files from character_exports/ subfolder
+  try {
+    const exportFolder = await folderHandle.getDirectoryHandle(CHAR_EXPORT_FOLDER);
+    for await (const [name, handle] of exportFolder.entries()) {
+      if (handle.kind === 'file' && name.endsWith('.json')) {
+        const file = await handle.getFile();
+        jsonFiles.push({ name, handle, file, modified: file.lastModified });
+      }
+    }
+  } catch(e) {} // subfolder doesn't exist yet — fine
 
   // Try to load game data files from folder
   await tryLoadDataFromFolder(jsonFiles);
