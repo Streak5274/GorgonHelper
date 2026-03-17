@@ -1,0 +1,10 @@
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary / tool output
+api-result.xml
+
+# Game exports (auto-generated, no need to track)
+Character_*.json
+*_items_*Z.json
