@@ -2154,7 +2154,7 @@ function toggleRecipeRow(k) {
 
 function buildRecipeRows(displayList, allRecipeKeys) {
   return displayList.map(([k, r]) => {
-    const [rName, rSkill, , resultItems] = r;
+    const [rName, rSkill, , resultItems, skillLevelReq] = r;
     const expanded = expandedRecipes.has(k);
     const safeK = k.replace(/'/g, "\\'");
 
@@ -2180,7 +2180,7 @@ function buildRecipeRows(displayList, allRecipeKeys) {
     if (!expanded) {
       return `<tr class="recipe-row" style="cursor:pointer" onclick="toggleRecipeRow('${safeK}')">
         <td><div style="display:flex;align-items:center;gap:4px">${recipeIconHtml}<span class="recipe-name">${rName}</span><span style="font-size:11px;color:var(--text-dim);margin-left:4px">▼</span></div></td>
-        <td><span class="recipe-skill-tag">${rSkill}</span></td>
+        <td><span class="recipe-skill-tag">${rSkill}</span>${skillLevelReq > 0 ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">Lv.${skillLevelReq}</span>` : ''}</td>
         <td style="white-space:nowrap">${charStack}</td>
       </tr>`;
     }
@@ -2216,16 +2216,17 @@ function buildRecipeRows(displayList, allRecipeKeys) {
     if (dataLoaded.sources_items) {
       const [,,ings] = r;
       if (ings?.length) {
-        const ingLines = ings.map(([ingId, qty]) => {
+        const ingLines = ings.map(([ingId, qty, chance]) => {
           const idata = ITEMS[String(ingId)];
           const iName = idata ? idata[0] : `#${ingId}`;
           const iconId = ITEMS_ICONS[String(ingId)];
           const iconUrl = iconId ? getIconUrl(iconId) : null;
           const iconHtml = iconUrl ? `<img class="item-icon" src="${iconUrl}" alt="" style="width:14px;height:14px;margin-right:4px;vertical-align:middle">` : '';
           const srcBadges = renderItemSources(ingId, 4, `rec_${k}`);
+          const chanceHtml = chance != null ? `<span style="font-size:10px;color:var(--orange);margin-left:4px">${Math.round(chance*100)}% consumed</span>` : '';
           return `<div style="display:flex;align-items:flex-start;gap:4px;padding:2px 0">
             <span style="font-size:11px;color:var(--text-dim);white-space:nowrap;min-width:14px">${qty}×</span>
-            <div>${iconHtml}<span style="font-size:11px;color:var(--text)">${iName}</span>${srcBadges}</div>
+            <div>${iconHtml}<span style="font-size:11px;color:var(--text)">${iName}</span>${chanceHtml}${srcBadges}</div>
           </div>`;
         }).join('');
         ingsHtml = `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(42,47,63,.5)">${ingLines}</div>`;
@@ -2247,7 +2248,7 @@ function buildRecipeRows(displayList, allRecipeKeys) {
           </div>
         </div>
       </td>
-      <td><span class="recipe-skill-tag">${rSkill}</span></td>
+      <td><span class="recipe-skill-tag">${rSkill}</span>${skillLevelReq > 0 ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">Lv.${skillLevelReq}</span>` : ''}</td>
       <td style="white-space:nowrap">${charStack}</td>
     </tr>`;
   }).join('');
