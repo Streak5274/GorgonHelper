@@ -267,6 +267,27 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg);color:var(--te
 .skill-picker-footer{padding:10px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px}
 .skill-picker-count{font-size:11px;color:var(--text-dim);flex:1}
 
+/* ── Maps tab ── */
+.map-outer{overflow:auto;border:1px solid var(--border);border-radius:6px;background:#0a0c10;max-height:calc(100vh - 210px)}
+.map-container{position:relative;display:inline-block;font-size:0;user-select:none}
+.map-container img{display:block;width:100%}
+.map-npc-marker{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:10}
+.map-npc-dot{width:10px;height:10px;border-radius:50%;border:2px solid rgba(0,0,0,.65);transition:transform .12s,box-shadow .12s}
+.map-npc-marker:hover .map-npc-dot,.map-npc-marker.selected .map-npc-dot{transform:scale(1.7);box-shadow:0 0 0 2px rgba(255,255,255,.5)}
+.map-npc-label{position:absolute;left:50%;transform:translateX(-50%);top:13px;background:rgba(0,0,0,.82);color:#fff;font-size:9px;padding:1px 5px;border-radius:2px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .1s}
+.map-npc-marker:hover .map-npc-label,.map-npc-marker.selected .map-npc-label{opacity:1}
+.map-landmark-marker{position:absolute;transform:translate(-50%,-50%);z-index:5;pointer-events:auto;cursor:default}
+.map-landmark-dot{width:7px;height:7px;border-radius:50%;opacity:.75;border:1px solid rgba(0,0,0,.5)}
+.map-landmark-marker:hover .map-landmark-dot{opacity:1;transform:scale(1.4)}
+.map-npc-panel{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;position:sticky;top:0}
+.map-panel-npc-name{font-size:15px;font-weight:600;color:var(--text-bright)}
+.map-panel-section{font-size:10px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:.1em;margin:12px 0 5px}
+.map-quest-item{font-size:12px;color:var(--text);padding:3px 0;border-bottom:1px solid rgba(42,47,63,.4)}
+.map-quest-item:last-child{border-bottom:none}
+.map-service-chip{display:inline-flex;font-size:10px;padding:2px 7px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text-dim);margin:2px 3px 2px 0}
+.map-legend-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);margin-bottom:3px}
+.map-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;border:2px solid rgba(0,0,0,.4)}
+
 /* ── Quests tab ── */
 .quest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px}
 .quest-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;transition:border-color .12s}
@@ -362,6 +383,7 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg);color:var(--te
   <div class="nav-tab" id="nav-vaults" onclick="setMainTab('vaults')">Storage Vaults</div>
   <div class="nav-tab" id="nav-favors" onclick="setMainTab('favors')">Favors</div>
   <div class="nav-tab" id="nav-quests" onclick="setMainTab('quests')">Quests</div>
+  <div class="nav-tab" id="nav-maps" onclick="setMainTab('maps')">Maps</div>
 </div>
 
 <div id="charTabsRow" class="char-tabs"></div>
@@ -390,10 +412,11 @@ let RECIPES = {};         // internalName -> [name, skill, [[ingId,qty]...], [[r
 let ITEMUSES = {};        // id -> [recipeInternalName, ...]
 let SOURCES_RECIPES = {}; // internalName -> [{t, npc?, npcName?, area?, skill?, item?}]
 let SOURCES_ITEMS = {};   // typeId -> [{t, n?, a?}]
-let NPCS = {};            // npcKey -> {name, area, desc, services}
+let NPCS = {};            // npcKey -> {name, area, areaName, desc, services, pos?:{x,z}}
 let VAULTS = {};          // vaultKey -> {name, area, numSlots, levels, grouping, reqDesc}
 let QUESTS = {};          // internalName -> {name, loc, npc, npcName, objs:[{t,n,d?,tid?}]}
-let dataLoaded = { items: false, recipes: false, itemuses: false, sources_recipes: false, sources_items: false, npcs: false, vaults: false, quests: false };
+let LANDMARKS = {};       // areaName -> [{name, type, desc, x, z}]
+let dataLoaded = { items: false, recipes: false, itemuses: false, sources_recipes: false, sources_items: false, npcs: false, vaults: false, quests: false, landmarks: false };
 let dataVersions = {}; // key -> version string read from _version field
 
 // ═══════════════════════════════════════════════════════════
@@ -713,7 +736,8 @@ async function tryLoadDataFromFolder(jsonFiles) {
   const wanted = {
     'pg_items.json':'items', 'pg_recipes.json':'recipes', 'pg_itemuses.json':'itemuses',
     'pg_sources_recipes.json':'sources_recipes', 'pg_sources_items.json':'sources_items',
-    'pg_npcs.json':'npcs', 'pg_storagevaults.json':'vaults', 'pg_quests.json':'quests'
+    'pg_npcs.json':'npcs', 'pg_storagevaults.json':'vaults', 'pg_quests.json':'quests',
+    'pg_landmarks.json':'landmarks'
   };
   for (const f of jsonFiles) {
     if (!wanted[f.name]) continue;
@@ -744,6 +768,7 @@ function applyGameData(key, data) {
   if (key === 'npcs')            { NPCS = data; dataLoaded.npcs = true; }
   if (key === 'vaults')          { VAULTS = data; dataLoaded.vaults = true; }
   if (key === 'quests')          { QUESTS = data; dataLoaded.quests = true; }
+  if (key === 'landmarks')       { LANDMARKS = data; dataLoaded.landmarks = true; }
   if (data._version) dataVersions[key] = data._version;
   updateSettingsStatus();
 }
@@ -1072,12 +1097,13 @@ function renderAll() {
   else if (mainTab === 'vaults')     renderVaultsTab();
   else if (mainTab === 'favors')     renderFavorsTab();
   else if (mainTab === 'quests')     renderQuestsTab();
+  else if (mainTab === 'maps')       renderMapsTab();
   else if (mainTab === 'settings')   renderSettingsTab();
 }
 
 function renderCharTabs() {
   const el = document.getElementById('charTabsRow');
-  if (mainTab !== 'storage' && mainTab !== 'workorders' && mainTab !== 'vaults' && mainTab !== 'favors' && mainTab !== 'quests') { el.innerHTML=''; return; }
+  if (mainTab !== 'storage' && mainTab !== 'workorders' && mainTab !== 'vaults' && mainTab !== 'favors' && mainTab !== 'quests' && mainTab !== 'maps') { el.innerHTML=''; return; }
   const isWO = (mainTab === 'workorders');
   const isVault = (mainTab === 'vaults');
   const isFavor = (mainTab === 'favors');
@@ -2182,6 +2208,34 @@ let favorAreaFilter = '';
 let favorSearchQ = '';
 let completedWOSearch = '';
 
+// Maps tab state
+let currentMapArea = 'AreaSerbule';
+let selectedMapNpcKey = null;
+let mapShowLandmarks = true;
+let mapShowNpcLabels = false;
+
+// Map configurations: world coordinate bounds per area (derived from NPC + landmark data)
+// worldMinX/Z and worldMaxX/Z are the world coordinate extents mapped to the image edges
+const MAP_CONFIGS = {
+  AreaSerbule: {
+    name: 'Serbule',
+    image: 'Maps/Map_AreaSerbule.webp',
+    worldMinX: 200, worldMaxX: 2550,
+    worldMinZ: 300, worldMaxZ: 2800,
+  },
+};
+
+function worldToMapPct(x, z, cfg) {
+  const px = (x - cfg.worldMinX) / (cfg.worldMaxX - cfg.worldMinX) * 100;
+  const py = (1 - (z - cfg.worldMinZ) / (cfg.worldMaxZ - cfg.worldMinZ)) * 100;
+  return { x: Math.max(-2, Math.min(102, px)), y: Math.max(-2, Math.min(102, py)) };
+}
+
+function setMapArea(area) { currentMapArea = area; selectedMapNpcKey = null; renderMapsTab(); }
+function selectMapNpc(key) { selectedMapNpcKey = (selectedMapNpcKey === key) ? null : key; renderMapsTab(); }
+function toggleMapLandmarks() { mapShowLandmarks = !mapShowLandmarks; renderMapsTab(); }
+function toggleMapLabels() { mapShowNpcLabels = !mapShowNpcLabels; renderMapsTab(); }
+
 function toggleRecipeRow(k) {
   if (expandedRecipes.has(k)) expandedRecipes.delete(k);
   else expandedRecipes.add(k);
@@ -2828,6 +2882,7 @@ const DATA_FILES = [
   { key:'npcs',            file:'pg_npcs.json',            cdn:'npcs.json',            label:'NPC Database',            desc:'NPC names, locations, services' },
   { key:'vaults',          file:'pg_storagevaults.json',   cdn:'storagevaults.json',   label:'Storage Vaults Database', desc:'Vault slot counts and NPC levels' },
   { key:'quests',          file:'pg_quests.json',          cdn:'quests.json',          label:'Quests Database',         desc:'Quest objectives and locations' },
+  { key:'landmarks',       file:'pg_landmarks.json',       cdn:null,                   label:'Landmarks Database',      desc:'Portals, pillars, and map points of interest' },
 ];
 
 // ── Icon system ──
@@ -3187,6 +3242,138 @@ function processCDNData(key, raw) {
     return out;
   }
   return raw;
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAPS TAB
+// ═══════════════════════════════════════════════════════════
+function renderMapsTab() {
+  const cfg = MAP_CONFIGS[currentMapArea];
+  if (!cfg) { document.getElementById('appContent').innerHTML = `<div class="full-panel"><div class="empty-state"><div class="icon">🗺</div><h3>No map available</h3></div></div>`; return; }
+
+  const char = characters.find(c => c.id === activeCharId);
+
+  // ── NPC markers ──
+  const areaNpcs = Object.entries(NPCS).filter(([, v]) => v.areaName === currentMapArea && v.pos);
+  const npcMarkers = areaNpcs.map(([key, npc]) => {
+    const p = worldToMapPct(npc.pos.x, npc.pos.z, cfg);
+    const favorLevel = char?.charData?.NPCs?.[key]?.FavorLevel || '';
+    const fc = FAVOR_COLORS[favorLevel];
+    const dotColor = fc ? fc.bar : 'rgba(160,160,160,.7)';
+    const sel = selectedMapNpcKey === key ? ' selected' : '';
+    const labelClass = mapShowNpcLabels ? ' style="opacity:1"' : '';
+    return `<div class="map-npc-marker${sel}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" onclick="selectMapNpc('${key}')" title="${npc.name}">
+      <div class="map-npc-dot" style="background:${dotColor}"></div>
+      <div class="map-npc-label"${labelClass}>${npc.name}</div>
+    </div>`;
+  }).join('');
+
+  // ── Landmark markers ──
+  const areaLandmarks = mapShowLandmarks ? (LANDMARKS[currentMapArea] || []) : [];
+  const LANDMARK_COLORS = { MeditationPillar:'#f0c040', TeleportationPlatform:'#40a8f0', Portal:'#d0d0d0' };
+  const landmarkMarkers = areaLandmarks.map(lm => {
+    const p = worldToMapPct(lm.x, lm.z, cfg);
+    const color = LANDMARK_COLORS[lm.type] || '#aaa';
+    const tip = lm.desc ? `${lm.name}: ${lm.desc}` : lm.name;
+    return `<div class="map-landmark-marker" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${tip.replace(/"/g,'&quot;')}">
+      <div class="map-landmark-dot" style="background:${color}"></div>
+    </div>`;
+  }).join('');
+
+  // ── Area selector ──
+  const areaOptions = Object.entries(MAP_CONFIGS)
+    .map(([k, v]) => `<option value="${k}"${k === currentMapArea ? ' selected' : ''}>${v.name}</option>`)
+    .join('');
+
+  // ── Detail panel ──
+  const detailHtml = selectedMapNpcKey ? renderMapNpcDetail(selectedMapNpcKey, char) :
+    `<div style="color:var(--text-dim);font-size:12px;line-height:1.6;margin-top:4px">Click an NPC marker to see details.</div>
+     <div class="map-panel-section">Legend</div>
+     ${Object.entries(FAVOR_COLORS).map(([lvl, c]) =>
+       `<div class="map-legend-row"><div class="map-legend-dot" style="background:${c.bar}"></div>${lvl}</div>`
+     ).join('')}
+     <div class="map-legend-row" style="margin-top:4px"><div class="map-legend-dot" style="background:rgba(160,160,160,.7)"></div>Unknown favor</div>
+     ${mapShowLandmarks ? `
+       <div class="map-panel-section">Landmarks</div>
+       <div class="map-legend-row"><div class="map-legend-dot" style="background:#f0c040"></div>Meditation Pillar</div>
+       <div class="map-legend-row"><div class="map-legend-dot" style="background:#40a8f0"></div>Teleport Platform</div>
+       <div class="map-legend-row"><div class="map-legend-dot" style="background:#d0d0d0"></div>Portal / Exit</div>` : ''}`;
+
+  document.getElementById('appContent').innerHTML = `<div class="full-panel" style="padding:12px 16px">
+    <div style="display:flex;gap:14px;align-items:flex-start">
+
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <select onchange="setMapArea(this.value)" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:13px">${areaOptions}</select>
+          <span style="font-size:11px;color:var(--text-dim)">${areaNpcs.length} NPCs · ${areaLandmarks.length} landmarks</span>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);cursor:pointer">
+            <input type="checkbox" ${mapShowLandmarks?'checked':''} onchange="toggleMapLandmarks()"> Landmarks
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);cursor:pointer">
+            <input type="checkbox" ${mapShowNpcLabels?'checked':''} onchange="toggleMapLabels()"> NPC labels
+          </label>
+        </div>
+        <div class="map-outer">
+          <div class="map-container" style="width:900px">
+            <img src="${cfg.image}" draggable="false" alt="${cfg.name} map">
+            ${npcMarkers}
+            ${landmarkMarkers}
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:6px">
+          Map coordinates calibrated from NPC + landmark data. If markers look off, world bounds can be tuned in MAP_CONFIGS.
+        </div>
+      </div>
+
+      <div style="width:240px;flex-shrink:0">
+        <div class="map-npc-panel">${detailHtml}</div>
+      </div>
+
+    </div>
+  </div>`;
+}
+
+function renderMapNpcDetail(npcKey, char) {
+  const npc = NPCS[npcKey];
+  if (!npc) return '';
+
+  const favorLevel = char?.charData?.NPCs?.[npcKey]?.FavorLevel || '';
+  const fc = FAVOR_COLORS[favorLevel];
+  const favorHtml = favorLevel
+    ? `<span class="favor-level-badge" style="color:${fc?.text||'var(--text-dim)'};background:${fc?.bg||'transparent'};border-color:${fc?.border||'var(--border)'}">${favorLevel}</span>`
+    : `<span style="font-size:12px;color:var(--text-dim)">No character loaded</span>`;
+
+  // Active quests returnable to this NPC
+  const returnableQuests = char ? (char.charData.ActiveQuests || [])
+    .map(q => QUESTS[q]).filter(q => q && q.npc === npcKey) : [];
+
+  // Services
+  const serviceTypes = [...new Set((npc.services || []).map(s => s.type))];
+
+  // Gift preferences
+  const prefs = (npc.prefs || []).slice(0, 4);
+
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px">
+      <div class="map-panel-npc-name">${npc.name}</div>
+      <button onclick="selectMapNpc('${npcKey}')" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;padding:0;line-height:1" title="Close">✕</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">${npc.area || ''}</div>
+    ${npc.desc ? `<div style="font-size:11px;color:var(--text);font-style:italic;margin-bottom:8px">${npc.desc}</div>` : ''}
+
+    <div style="margin-bottom:10px">${favorHtml}</div>
+
+    ${returnableQuests.length ? `
+      <div class="map-panel-section">Returnable Quests</div>
+      <div>${returnableQuests.map(q => `<div class="map-quest-item">${q.name}</div>`).join('')}</div>` : ''}
+
+    ${serviceTypes.length ? `
+      <div class="map-panel-section">Services</div>
+      <div>${serviceTypes.map(t => `<span class="map-service-chip">${t}</span>`).join('')}</div>` : ''}
+
+    ${prefs.length ? `
+      <div class="map-panel-section">Gift Preferences</div>
+      <div>${prefs.map(p => `<div style="font-size:11px;color:var(--text-dim);padding:2px 0">${p.name || ''} <span style="color:var(--text)">${p.desire||''}</span></div>`).join('')}</div>` : ''}`;
 }
 
 // ═══════════════════════════════════════════════════════════
