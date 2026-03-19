@@ -890,6 +890,19 @@ function getCharItemMap(char) {
 }
 
 function invalidateCharItemMap(charId) { _charItemMaps.delete(charId); }
+
+// Returns merged {vaultName: qty} for a typeId across the given chars, or null if none found
+function getQuestItemVaults(tid, chars) {
+  const merged = {};
+  for (const char of chars) {
+    const item = getCharItemMap(char).get(tid);
+    if (!item) continue;
+    for (const [vault, qty] of Object.entries(item.vaults)) {
+      merged[vault] = (merged[vault] || 0) + qty;
+    }
+  }
+  return Object.keys(merged).length ? merged : null;
+}
 function woKeyToDisplayName(woKey) {
   const parts = woKey.split('_');
   const skill = parts[0];
@@ -3094,6 +3107,19 @@ function renderQuestsTab() {
         ? `<span class="quest-obj-desc quest-item-link" style="flex:1" title="Click to view recipe" onclick="goToRecipe('${safeN}')">${iName} 🔗</span>`
         : `<span class="quest-obj-desc" style="flex:1">${iName}</span>`;
 
+      // Vault storage info — skip if craftable and have none
+      let vaultHtml = '';
+      if (have > 0 && !(isCraftable && have === 0)) {
+        const vaultChars = showAll ? characters : qChars;
+        const vaultsMap = getQuestItemVaults(obj.tid, vaultChars);
+        if (vaultsMap) {
+          const tags = Object.entries(vaultsMap)
+            .map(([v, q]) => `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:10px;color:var(--text-dim);white-space:nowrap">${v}<span style="color:var(--gold-dim)">×${q}</span></span>`)
+            .join('');
+          vaultHtml = `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${tags}</div>`;
+        }
+      }
+
       return `<div class="quest-obj-row">
         <div class="quest-obj-bar-wrap">
           <div style="display:flex;align-items:center;margin-bottom:3px">
@@ -3103,6 +3129,7 @@ function renderQuestsTab() {
           <div class="wo-bar-wrap" style="height:4px">
             <div class="wo-bar ${barCls}" style="width:${pct}%"></div>
           </div>
+          ${vaultHtml}
         </div>
       </div>`;
     }).join('');
