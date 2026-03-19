@@ -1050,7 +1050,6 @@ function getTrainingForRecipe(recipeKey) {
 }
 
 const FAVOR_LABELS = { Despised:'Despised', Hatred:'Hatred', Neutral:'Neutral', Comfortable:'Comfortable', Friends:'Friends', CloseFriends:'Close Friends', BestFriends:'Best Friends', LikeFamily:'Like Family', SoulMates:'Soul Mates' };
-const FAVOR_COLORS = { Despised:'#e07070', Hatred:'#e07070', Neutral:'#aaa', Comfortable:'#90b870', Friends:'#60a8e0', CloseFriends:'#a87adc', BestFriends:'#e0a830', LikeFamily:'#e06060', SoulMates:'#ff88aa' };
 
 function showRecipeSourceTooltip(recipeKey, e) {
   hideRecipeSourceTooltip();
@@ -1065,7 +1064,7 @@ function showRecipeSourceTooltip(recipeKey, e) {
         // Look up accurate favor+cost from NPC_TRAINING
         const td = trainingData.find(t => t.npcKey === s.npc || t.npcName === (s.npcName||s.npc));
         const favorLabel = td ? (FAVOR_LABELS[td.favor] || td.favor) : null;
-        const favorColor = td ? (FAVOR_COLORS[td.favor] || '#aaa') : '#7aa0e8';
+        const favorColor = td ? (FAVOR_COLORS[td.favor]?.text || '#aaa') : '#7aa0e8';
         const costStr = td?.cost != null ? `<span style="color:var(--gold);margin-left:6px">${td.cost.toLocaleString()} 🪙</span>` : '';
         const favorStr = favorLabel ? `<span style="color:${favorColor};margin-left:6px">${favorLabel}</span>` : '';
         return `<div class="ing-tooltip-row"><span style="color:#7aa0e8">🎓 ${s.npcName||s.npc||'?'}</span><span class="ing-tooltip-vault">${s.area||''}</span>${favorStr}${costStr}</div>`;
