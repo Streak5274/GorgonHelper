@@ -1038,8 +1038,20 @@ function showRecipeSourceTooltip(recipeKey, e) {
     const rName = recipe ? recipe[0] : recipeKey;
 
     const sourceRows = sources.map(s => {
-      if (s.t === 'Training') return `<div class="ing-tooltip-row"><span style="color:#7aa0e8">🎓 ${s.npcName||s.npc||'?'}</span><span class="ing-tooltip-vault">${s.area||''}</span></div>`;
-      if (s.t === 'HangOut')  return `<div class="ing-tooltip-row"><span style="color:#a880d0">🤝 ${s.npcName||s.npc||'?'}</span><span class="ing-tooltip-vault">${s.area||''}</span></div>`;
+      if (s.t === 'Training') {
+        const npc = dataLoaded.npcs ? NPCS[s.npc] : null;
+        const svc = npc?.services?.find(sv => sv.type === 'Training');
+        const favor = svc?.favor || null;
+        const favorHtml = favor ? ` <span style="color:${FAVOR_COLOR(favor)};font-size:10px">${favor}</span>` : '';
+        return `<div class="ing-tooltip-row"><span style="color:#7aa0e8">🎓 ${s.npcName||s.npc||'?'}${favorHtml}</span><span class="ing-tooltip-vault">${s.area||''}</span></div>`;
+      }
+      if (s.t === 'HangOut') {
+        const npc = dataLoaded.npcs ? NPCS[s.npc] : null;
+        const svc = npc?.services?.find(sv => sv.type === 'HangOut');
+        const favor = svc?.favor || null;
+        const favorHtml = favor ? ` <span style="color:${FAVOR_COLOR(favor)};font-size:10px">${favor}</span>` : '';
+        return `<div class="ing-tooltip-row"><span style="color:#a880d0">🤝 ${s.npcName||s.npc||'?'}${favorHtml}</span><span class="ing-tooltip-vault">${s.area||''}</span></div>`;
+      }
       if (s.t === 'Skill')    return `<div class="ing-tooltip-row"><span style="color:#7ab880">📚 Skill: ${s.skill||'?'}</span></div>`;
       if (s.t === 'Item')     return `<div class="ing-tooltip-row"><span style="color:var(--gold)">📦 ${ITEMS[String(s.item)]?.[0]||`item #${s.item}`}</span></div>`;
       if (s.t === 'NpcGift')  return `<div class="ing-tooltip-row"><span style="color:#e07070">🎁 ${s.npcName||s.npc||'Gift'}</span><span class="ing-tooltip-vault">${s.area||''}</span></div>`;
