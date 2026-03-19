@@ -412,12 +412,13 @@ let ITEMS = {};           // id -> [name, maxStack]
 let RECIPES = {};         // internalName -> [name, skill, [[ingId,qty]...], [[resId,qty]...]]
 let ITEMUSES = {};        // id -> [recipeInternalName, ...]
 let SOURCES_RECIPES = {}; // internalName -> [{t, npc?, npcName?, area?, skill?, item?}]
+let NPC_TRAINING = {};   // npcKey -> [{name, favor, cost, skillLevel, recipeKey}]
 let SOURCES_ITEMS = {};   // typeId -> [{t, n?, a?}]
 let NPCS = {};            // npcKey -> {name, area, areaName, desc, services, pos?:{x,z}}
 let VAULTS = {};          // vaultKey -> {name, area, numSlots, levels, grouping, reqDesc}
 let QUESTS = {};          // internalName -> {name, loc, npc, npcName, objs:[{t,n,d?,tid?}]}
 let LANDMARKS = {};       // areaName -> [{name, type, desc, x, z}]
-let dataLoaded = { items: false, recipes: false, itemuses: false, sources_recipes: false, sources_items: false, npcs: false, vaults: false, quests: false, landmarks: false };
+let dataLoaded = { items: false, recipes: false, itemuses: false, sources_recipes: false, sources_items: false, npcs: false, vaults: false, quests: false, landmarks: false, npc_training: false };
 let dataVersions = {}; // key -> version string read from _version field
 
 // ═══════════════════════════════════════════════════════════
@@ -738,7 +739,7 @@ async function tryLoadDataFromFolder(jsonFiles) {
     'pg_items.json':'items', 'pg_recipes.json':'recipes', 'pg_itemuses.json':'itemuses',
     'pg_sources_recipes.json':'sources_recipes', 'pg_sources_items.json':'sources_items',
     'pg_npcs.json':'npcs', 'pg_storagevaults.json':'vaults', 'pg_quests.json':'quests',
-    'pg_landmarks.json':'landmarks'
+    'pg_landmarks.json':'landmarks', 'pg_npc_training.json':'npc_training'
   };
   for (const f of jsonFiles) {
     if (!wanted[f.name]) continue;
@@ -770,6 +771,7 @@ function applyGameData(key, data) {
   if (key === 'vaults')          { VAULTS = data; dataLoaded.vaults = true; }
   if (key === 'quests')          { QUESTS = data; dataLoaded.quests = true; }
   if (key === 'landmarks')       { LANDMARKS = data; dataLoaded.landmarks = true; }
+  if (key === 'npc_training')    { NPC_TRAINING = data; dataLoaded.npc_training = true; }
   if (data._version) dataVersions[key] = data._version;
   updateSettingsStatus();
 }
@@ -1030,15 +1032,44 @@ function hideIngTooltip() {
 // ── Recipe source tooltip (used on WO recipe chip) ──
 let recipeSourceTooltipTimer = null;
 
+// Build recipeKey → training entries lookup from NPC_TRAINING
+function getTrainingForRecipe(recipeKey) {
+  if (!dataLoaded.npc_training) return [];
+  const results = [];
+  for (const [npcKey, entries] of Object.entries(NPC_TRAINING)) {
+    if (npcKey.startsWith('_')) continue;
+    for (const e of entries) {
+      if (e.recipeKey === recipeKey) {
+        const npc = NPCS[npcKey];
+        results.push({ npcKey, npcName: npc?.name || e.name, area: npc?.area || '', favor: e.favor, cost: e.cost, skillLevel: e.skillLevel });
+        break;
+      }
+    }
+  }
+  return results;
+}
+
+const FAVOR_LABELS = { Despised:'Despised', Hatred:'Hatred', Neutral:'Neutral', Comfortable:'Comfortable', Friends:'Friends', CloseFriends:'Close Friends', BestFriends:'Best Friends', LikeFamily:'Like Family', SoulMates:'Soul Mates' };
+const FAVOR_COLORS = { Despised:'#e07070', Hatred:'#e07070', Neutral:'#aaa', Comfortable:'#90b870', Friends:'#60a8e0', CloseFriends:'#a87adc', BestFriends:'#e0a830', LikeFamily:'#e06060', SoulMates:'#ff88aa' };
+
 function showRecipeSourceTooltip(recipeKey, e) {
   hideRecipeSourceTooltip();
   recipeSourceTooltipTimer = setTimeout(() => {
     const sources = dataLoaded.sources_recipes ? (SOURCES_RECIPES[recipeKey] || []) : [];
+    const trainingData = getTrainingForRecipe(recipeKey); // per-NPC favor+cost
     const recipe = RECIPES[recipeKey];
     const rName = recipe ? recipe[0] : recipeKey;
 
     const sourceRows = sources.map(s => {
-      if (s.t === 'Training') return `<div class="ing-tooltip-row"><span style="color:#7aa0e8">🎓 ${s.npcName||s.npc||'?'}</span><span class="ing-tooltip-vault">${s.area||''}</span></div>`;
+      if (s.t === 'Training') {
+        // Look up accurate favor+cost from NPC_TRAINING
+        const td = trainingData.find(t => t.npcKey === s.npc || t.npcName === (s.npcName||s.npc));
+        const favorLabel = td ? (FAVOR_LABELS[td.favor] || td.favor) : null;
+        const favorColor = td ? (FAVOR_COLORS[td.favor] || '#aaa') : '#7aa0e8';
+        const costStr = td?.cost != null ? `<span style="color:var(--gold);margin-left:6px">${td.cost.toLocaleString()} 🪙</span>` : '';
+        const favorStr = favorLabel ? `<span style="color:${favorColor};margin-left:6px">${favorLabel}</span>` : '';
+        return `<div class="ing-tooltip-row"><span style="color:#7aa0e8">🎓 ${s.npcName||s.npc||'?'}</span><span class="ing-tooltip-vault">${s.area||''}</span>${favorStr}${costStr}</div>`;
+      }
       if (s.t === 'HangOut')  return `<div class="ing-tooltip-row"><span style="color:#a880d0">🤝 ${s.npcName||s.npc||'?'}</span><span class="ing-tooltip-vault">${s.area||''}</span></div>`;
       if (s.t === 'Skill')    return `<div class="ing-tooltip-row"><span style="color:#7ab880">📚 Skill: ${s.skill||'?'}</span></div>`;
       if (s.t === 'Item')     return `<div class="ing-tooltip-row"><span style="color:var(--gold)">📦 ${ITEMS[String(s.item)]?.[0]||`item #${s.item}`}</span></div>`;
@@ -3185,6 +3216,7 @@ const DATA_FILES = [
   { key:'vaults',          file:'pg_storagevaults.json',   cdn:'storagevaults.json',   label:'Storage Vaults Database', desc:'Vault slot counts and NPC levels' },
   { key:'quests',          file:'pg_quests.json',          cdn:'quests.json',          label:'Quests Database',         desc:'Quest objectives and locations' },
   { key:'landmarks',       file:'pg_landmarks.json',       cdn:null,                   label:'Landmarks Database',      desc:'Portals, pillars, and map points of interest' },
+  { key:'npc_training',   file:'pg_npc_training.json',    cdn:null,                   label:'NPC Training Database',   desc:'Per-recipe favor level and cost for trainers' },
 ];
 
 // ── Icon system ──
