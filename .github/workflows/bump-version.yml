@@ -1,0 +1,38 @@
+name: Bump Version
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  bump:
+    # Skip if this push is already a version bump (avoid infinite loop)
+    if: "!startsWith(github.event.head_commit.message, 'Bump version to')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump patch version
+        run: |
+          FILE="mmorpg_inventory.html"
+          CURRENT=$(grep -o "APP_VERSION = '[0-9]*\.[0-9]*\.[0-9]*'" "$FILE" | grep -o "[0-9]*\.[0-9]*\.[0-9]*")
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT" | cut -d. -f3)
+          NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i "s/APP_VERSION = '$CURRENT'/APP_VERSION = '$NEW_VERSION'/" "$FILE"
+          echo "Bumped $CURRENT -> $NEW_VERSION"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add mmorpg_inventory.html
+          git commit -m "Bump version to $NEW_VERSION"
+          git push
