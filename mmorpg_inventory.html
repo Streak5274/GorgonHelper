@@ -412,12 +412,13 @@ let ITEMS = {};           // id -> [name, maxStack]
 let RECIPES = {};         // internalName -> [name, skill, [[ingId,qty]...], [[resId,qty]...]]
 let ITEMUSES = {};        // id -> [recipeInternalName, ...]
 let SOURCES_RECIPES = {}; // internalName -> [{t, npc?, npcName?, area?, skill?, item?}]
+let NPC_TRAINING = {};   // npcKey -> [{name, favor, cost, skillLevel, recipeKey}]
 let SOURCES_ITEMS = {};   // typeId -> [{t, n?, a?}]
 let NPCS = {};            // npcKey -> {name, area, areaName, desc, services, pos?:{x,z}}
 let VAULTS = {};          // vaultKey -> {name, area, numSlots, levels, grouping, reqDesc}
 let QUESTS = {};          // internalName -> {name, loc, npc, npcName, objs:[{t,n,d?,tid?}]}
 let LANDMARKS = {};       // areaName -> [{name, type, desc, x, z}]
-let dataLoaded = { items: false, recipes: false, itemuses: false, sources_recipes: false, sources_items: false, npcs: false, vaults: false, quests: false, landmarks: false };
+let dataLoaded = { items: false, recipes: false, itemuses: false, sources_recipes: false, sources_items: false, npcs: false, vaults: false, quests: false, landmarks: false, npc_training: false };
 let dataVersions = {}; // key -> version string read from _version field
 
 // ═══════════════════════════════════════════════════════════
@@ -738,7 +739,7 @@ async function tryLoadDataFromFolder(jsonFiles) {
     'pg_items.json':'items', 'pg_recipes.json':'recipes', 'pg_itemuses.json':'itemuses',
     'pg_sources_recipes.json':'sources_recipes', 'pg_sources_items.json':'sources_items',
     'pg_npcs.json':'npcs', 'pg_storagevaults.json':'vaults', 'pg_quests.json':'quests',
-    'pg_landmarks.json':'landmarks'
+    'pg_landmarks.json':'landmarks', 'pg_npc_training.json':'npc_training'
   };
   for (const f of jsonFiles) {
     if (!wanted[f.name]) continue;
@@ -770,6 +771,7 @@ function applyGameData(key, data) {
   if (key === 'vaults')          { VAULTS = data; dataLoaded.vaults = true; }
   if (key === 'quests')          { QUESTS = data; dataLoaded.quests = true; }
   if (key === 'landmarks')       { LANDMARKS = data; dataLoaded.landmarks = true; }
+  if (key === 'npc_training')    { NPC_TRAINING = data; dataLoaded.npc_training = true; }
   if (data._version) dataVersions[key] = data._version;
   updateSettingsStatus();
 }
@@ -890,6 +892,19 @@ function getCharItemMap(char) {
 }
 
 function invalidateCharItemMap(charId) { _charItemMaps.delete(charId); }
+
+// Returns merged {vaultName: qty} for a typeId across the given chars, or null if none found
+function getQuestItemVaults(tid, chars) {
+  const merged = {};
+  for (const char of chars) {
+    const item = getCharItemMap(char).get(tid);
+    if (!item) continue;
+    for (const [vault, qty] of Object.entries(item.vaults)) {
+      merged[vault] = (merged[vault] || 0) + qty;
+    }
+  }
+  return Object.keys(merged).length ? merged : null;
+}
 function woKeyToDisplayName(woKey) {
   const parts = woKey.split('_');
   const skill = parts[0];
@@ -1017,15 +1032,43 @@ function hideIngTooltip() {
 // ── Recipe source tooltip (used on WO recipe chip) ──
 let recipeSourceTooltipTimer = null;
 
+// Build recipeKey → training entries lookup from NPC_TRAINING
+function getTrainingForRecipe(recipeKey) {
+  if (!dataLoaded.npc_training) return [];
+  const results = [];
+  for (const [npcKey, entries] of Object.entries(NPC_TRAINING)) {
+    if (npcKey.startsWith('_')) continue;
+    for (const e of entries) {
+      if (e.recipeKey === recipeKey) {
+        const npc = NPCS[npcKey];
+        results.push({ npcKey, npcName: npc?.name || e.name, area: npc?.area || '', favor: e.favor, cost: e.cost, skillLevel: e.skillLevel });
+        break;
+      }
+    }
+  }
+  return results;
+}
+
+const FAVOR_LABELS = { Despised:'Despised', Hatred:'Hatred', Neutral:'Neutral', Comfortable:'Comfortable', Friends:'Friends', CloseFriends:'Close Friends', BestFriends:'Best Friends', LikeFamily:'Like Family', SoulMates:'Soul Mates' };
+
 function showRecipeSourceTooltip(recipeKey, e) {
   hideRecipeSourceTooltip();
   recipeSourceTooltipTimer = setTimeout(() => {
     const sources = dataLoaded.sources_recipes ? (SOURCES_RECIPES[recipeKey] || []) : [];
+    const trainingData = getTrainingForRecipe(recipeKey); // per-NPC favor+cost
     const recipe = RECIPES[recipeKey];
     const rName = recipe ? recipe[0] : recipeKey;
 
     const sourceRows = sources.map(s => {
-      if (s.t === 'Training') return `<div class="ing-tooltip-row"><span style="color:#7aa0e8">🎓 ${s.npcName||s.npc||'?'}</span><span class="ing-tooltip-vault">${s.area||''}</span></div>`;
+      if (s.t === 'Training') {
+        // Look up accurate favor+cost from NPC_TRAINING
+        const td = trainingData.find(t => t.npcKey === s.npc || t.npcName === (s.npcName||s.npc));
+        const favorLabel = td ? (FAVOR_LABELS[td.favor] || td.favor) : null;
+        const favorColor = td ? (FAVOR_COLORS[td.favor]?.text || '#aaa') : '#7aa0e8';
+        const costStr = td?.cost != null ? `<span style="color:var(--gold);margin-left:6px">${td.cost.toLocaleString()} 🪙</span>` : '';
+        const favorStr = favorLabel ? `<span style="color:${favorColor};margin-left:6px">${favorLabel}</span>` : '';
+        return `<div class="ing-tooltip-row"><span style="color:#7aa0e8">🎓 ${s.npcName||s.npc||'?'}</span><span class="ing-tooltip-vault">${s.area||''}</span>${favorStr}${costStr}</div>`;
+      }
       if (s.t === 'HangOut')  return `<div class="ing-tooltip-row"><span style="color:#a880d0">🤝 ${s.npcName||s.npc||'?'}</span><span class="ing-tooltip-vault">${s.area||''}</span></div>`;
       if (s.t === 'Skill')    return `<div class="ing-tooltip-row"><span style="color:#7ab880">📚 Skill: ${s.skill||'?'}</span></div>`;
       if (s.t === 'Item')     return `<div class="ing-tooltip-row"><span style="color:var(--gold)">📦 ${ITEMS[String(s.item)]?.[0]||`item #${s.item}`}</span></div>`;
@@ -1447,8 +1490,8 @@ function toggleSourceExpand(key, typeId, maxEntries, e) {
   if (el) el.outerHTML = buildItemSourcesHtml(typeId, maxEntries, key);
 }
 
-function buildItemSourcesHtml(typeId, maxEntries, key) {
-  const sources = SOURCES_ITEMS[String(typeId)];
+function buildItemSourcesHtml(typeId, maxEntries, key, filteredSources) {
+  const sources = filteredSources || SOURCES_ITEMS[String(typeId)];
   if (!sources || sources.length === 0) return '';
   const expanded = expandedSources.has(key);
   const shown = expanded ? sources : sources.slice(0, maxEntries);
@@ -1469,12 +1512,14 @@ function buildItemSourcesHtml(typeId, maxEntries, key) {
   return `<div id="src_${key}" style="margin-top:4px;display:flex;flex-wrap:wrap;gap:2px;align-items:center">${badges}${toggleBtn}</div>`;
 }
 
-function renderItemSources(typeId, maxEntries = 6, ctxKey = '') {
+function renderItemSources(typeId, maxEntries = 6, ctxKey = '', excludeTypes = []) {
   if (!dataLoaded.sources_items || !typeId) return '';
-  const sources = SOURCES_ITEMS[String(typeId)];
+  let sources = SOURCES_ITEMS[String(typeId)];
   if (!sources || sources.length === 0) return '';
+  if (excludeTypes.length) sources = sources.filter(s => !excludeTypes.includes(s.t));
+  if (sources.length === 0) return '';
   const key = ctxKey ? `${ctxKey}_${typeId}` : String(typeId);
-  return buildItemSourcesHtml(typeId, maxEntries, key);
+  return buildItemSourcesHtml(typeId, maxEntries, key, sources);
 }
 
 function positionTooltip(tip, e) {
@@ -1799,6 +1844,7 @@ function scrollNameToWOKey(scrollName) {
 const expandedAvailWOs = new Set();
 const expandedWOs = new Set();       // woKey_charId -> expanded active/completed WOs
 const expandedRecipes = new Set();   // recipe internalName -> expanded recipe rows
+const expandedFavorNpcs = new Set(); // npcKey -> expanded training panel
 
 function toggleAvailWO(woKey) {
   if (expandedAvailWOs.has(woKey)) expandedAvailWOs.delete(woKey);
@@ -1812,6 +1858,47 @@ function toggleAvailWO(woKey) {
 }
 
 let _availWOEntries = null; // cache for toggle re-renders
+let availWOSearchQ = '';
+
+function onAvailWOSearch(v) {
+  availWOSearchQ = v;
+  filterAvailWOs();
+  setTimeout(() => {
+    const el = document.getElementById('availWOSearch');
+    if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }, 10);
+}
+function clearAvailWOSearch() { availWOSearchQ = ''; renderAvailableWOsTab(); }
+
+function filterAvailWOs() {
+  const q = availWOSearchQ.toLowerCase();
+  const entries = _availWOEntries;
+  if (!entries) return;
+
+  const bySkill = {};
+  for (const entry of entries) {
+    const skill = entry.woKey.split('_')[0];
+    const recipe = entry.recipe;
+    const name = recipe ? recipe[0] : woKeyToDisplayName(entry.woKey);
+    if (q && !name.toLowerCase().includes(q) && !skill.toLowerCase().includes(q)) continue;
+    if (!bySkill[skill]) bySkill[skill] = [];
+    bySkill[skill].push(entry);
+  }
+
+  const container = document.getElementById('availWOList');
+  if (!container) return;
+  let filtered = 0;
+  let html = '';
+  for (const [skill, skillEntries] of Object.entries(bySkill).sort()) {
+    html += `<div style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:.12em;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)">${skill}</div>`;
+    for (const entry of skillEntries) { html += renderAvailWOCard(entry); filtered++; }
+  }
+  container.innerHTML = html || '<div style="color:var(--text-dim);padding:16px;font-size:13px">No results</div>';
+  const badge = document.getElementById('availWOBadge');
+  if (badge) badge.textContent = filtered;
+  const clearBtn = document.querySelector('#availWOSearch')?.previousElementSibling;
+  if (clearBtn) clearBtn.classList.toggle('visible', !!q);
+}
 
 function renderAvailableWOsTab() {
   const allChars = characters;
@@ -1860,17 +1947,26 @@ function renderAvailableWOsTab() {
     bySkill[skill].push(entry);
   }
 
-  let html = `<div class="full-panel"><div class="wo-section"><div class="wo-section-title">Available Work Order Scrolls <span class="badge">${entries.length}</span></div>`;
-
+  let skillRows = '';
   for (const [skill, skillEntries] of Object.entries(bySkill).sort()) {
-    html += `<div style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:.12em;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)">${skill}</div>`;
-    for (const entry of skillEntries) {
-      html += renderAvailWOCard(entry);
-    }
+    skillRows += `<div style="font-family:'Cinzel',serif;font-size:10px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:.12em;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)">${skill}</div>`;
+    for (const entry of skillEntries) skillRows += renderAvailWOCard(entry);
   }
 
-  html += '</div></div>';
+  const html = `<div class="full-panel"><div class="wo-section">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="wo-section-title" style="margin:0">Available Work Order Scrolls <span id="availWOBadge" class="badge">${entries.length}</span></div>
+      <div class="search-input-wrap" style="max-width:260px">
+        <button class="search-clear ${availWOSearchQ?'visible':''}" onclick="clearAvailWOSearch()">✕</button>
+        <input class="search-input" id="availWOSearch" style="padding-left:34px" placeholder="Search…"
+          value="${availWOSearchQ.replace(/"/g,'&quot;')}" oninput="onAvailWOSearch(this.value)">
+        <span class="search-icon">⌕</span>
+      </div>
+    </div>
+    <div id="availWOList">${skillRows}</div>
+  </div></div>`;
   document.getElementById('appContent').innerHTML = html;
+  if (availWOSearchQ) filterAvailWOs();
 }
 
 function renderAvailWOCard(entry) {
@@ -2006,6 +2102,79 @@ function setFavorAreaFilter(area) {
 function onFavorSearch(v) { favorSearchQ = v; renderFavorsTab(); }
 function clearFavorSearch() { favorSearchQ = ''; renderFavorsTab(); }
 
+function toggleFavorNpc(key) {
+  if (expandedFavorNpcs.has(key)) expandedFavorNpcs.delete(key);
+  else expandedFavorNpcs.add(key);
+  // Partial re-render — just rebuild tbody to avoid losing search focus
+  const tbody = document.getElementById('favorTbody');
+  if (tbody) {
+    const showAll = activeCharId === '__all__';
+    const chars = showAll ? characters : characters.filter(c => c.id === activeCharId);
+    tbody.innerHTML = _lastFavorRows ? _lastFavorRows(chars, showAll) : '';
+  }
+}
+let _lastFavorRows = null; // stored builder fn for partial re-renders
+
+function buildFavorTrainingPanel(npcKey, chars) {
+  const entries = NPC_TRAINING[npcKey];
+  if (!entries || entries.length === 0) return '';
+
+  // Get recipe completions across all chars: recipeKey -> Set of charIds that know it
+  const known = {};
+  for (const char of chars) {
+    const completions = char.charData.RecipeCompletions || {};
+    for (const rk of Object.keys(completions)) {
+      if (!known[rk]) known[rk] = new Set();
+      known[rk].add(char.id);
+    }
+  }
+  const singleChar = chars.length === 1;
+
+  // Group entries by skill (from RECIPES lookup, else 'Other')
+  const bySkill = {};
+  for (const e of entries) {
+    const skill = (e.recipeKey && RECIPES[e.recipeKey]) ? RECIPES[e.recipeKey][1] : 'Abilities';
+    if (!bySkill[skill]) bySkill[skill] = [];
+    bySkill[skill].push(e);
+  }
+
+  let html = `<div style="padding:8px 4px 4px">`;
+  for (const [skill, skillEntries] of Object.entries(bySkill).sort()) {
+    html += `<div style="font-family:'Cinzel',serif;font-size:9px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:.1em;margin:8px 0 5px;padding-bottom:3px;border-bottom:1px solid var(--border)">${skill}</div>`;
+    html += `<div style="display:flex;flex-direction:column;gap:3px">`;
+    for (const e of skillEntries.sort((a,b) => (a.skillLevel||0)-(b.skillLevel||0))) {
+      const fc = FAVOR_COLORS[e.favor] || FAVOR_COLORS.Neutral;
+      const favorLabel = FAVOR_LABELS[e.favor] || e.favor || '?';
+      const costStr = e.cost != null ? `<span style="color:var(--gold-dim);font-size:10px;margin-left:6px">${e.cost.toLocaleString()} 🪙</span>` : '';
+      const lvlStr = e.skillLevel != null ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">Lv.${e.skillLevel}</span>` : '';
+
+      // Learned indicator (only for recipe entries)
+      let learnedHtml = '';
+      if (e.recipeKey) {
+        if (singleChar) {
+          const isKnown = !!known[e.recipeKey]?.size;
+          learnedHtml = `<span style="font-size:11px;margin-right:5px;color:${isKnown ? 'var(--green)' : 'var(--text-dim)'}">${isKnown ? '✓' : '✗'}</span>`;
+        } else {
+          const knownCount = known[e.recipeKey]?.size || 0;
+          if (knownCount > 0) learnedHtml = `<span style="font-size:10px;margin-right:5px;color:var(--green)">✓${knownCount}</span>`;
+          else learnedHtml = `<span style="font-size:10px;margin-right:5px;color:var(--text-dim)">✗</span>`;
+        }
+      }
+
+      html += `<div style="display:flex;align-items:center;gap:0;padding:1px 0">
+        ${learnedHtml}
+        <span style="font-size:12px;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.name}</span>
+        ${lvlStr}
+        ${costStr}
+        <span style="font-size:10px;margin-left:8px;padding:1px 6px;border-radius:3px;background:${fc.bg};color:${fc.text};border:1px solid ${fc.border};white-space:nowrap">${favorLabel}</span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
 function renderFavorsTab() {
   const showAll = activeCharId === '__all__';
   const chars = showAll ? characters : characters.filter(c => c.id === activeCharId);
@@ -2068,11 +2237,10 @@ function renderFavorsTab() {
   // Character column headers — single col in all-chars mode
   const charHeaders = showAll ? '<th>Favor by Character</th>' : '';
 
-  // Table rows
-  const rows = npcs.map(npc => {
-    // In all-chars mode: stack each char's favor bar vertically in one cell
-    const favorCell = showAll
-      ? `<td class="favor-bar-cell">${chars.map(c => {
+  // Table rows builder (stored for partial re-renders on toggle)
+  const buildRows = (charList, isAll) => npcs.map(npc => {
+    const favorCell = isAll
+      ? `<td class="favor-bar-cell">${charList.map(c => {
           const favor = npc.chars[c.id];
           if (!favor) return '';
           return `<div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
@@ -2083,17 +2251,28 @@ function renderFavorsTab() {
       : `<td class="favor-bar-cell">${renderFavorCell(Object.values(npc.chars)[0] || 'Neutral')}</td>`;
 
     const safeKey = npc.key.replace(/'/g,"\\'");
+    const hasTraining = dataLoaded.npc_training && NPC_TRAINING[npc.key]?.length > 0;
+    const expanded = expandedFavorNpcs.has(npc.key);
+    const toggleIcon = hasTraining ? `<span style="font-size:10px;color:var(--text-dim);margin-left:5px">${expanded ? '▲' : '▼'}</span>` : '';
 
-    return `<tr class="favor-row"
+    const detailRow = (hasTraining && expanded)
+      ? `<tr><td colspan="2" style="padding:0 8px 10px 12px;background:var(--bg2);border-bottom:1px solid var(--border)">${buildFavorTrainingPanel(npc.key, charList)}</td></tr>`
+      : '';
+
+    return `<tr class="favor-row" style="${hasTraining ? 'cursor:pointer' : ''}"
+      onclick="${hasTraining ? `toggleFavorNpc('${safeKey}')` : ''}"
       onmouseenter="showNpcPrefTooltip('${safeKey}', event)"
       onmouseleave="hideNpcPrefTooltip()">
       <td>
-        <div class="favor-npc-name">${npc.name}</div>
+        <div class="favor-npc-name">${npc.name}${toggleIcon}</div>
         ${npc.area ? `<div class="favor-npc-area">${npc.area}</div>` : ''}
       </td>
       ${favorCell}
-    </tr>`;
+    </tr>${detailRow}`;
   }).join('');
+
+  _lastFavorRows = buildRows;
+  const rows = buildRows(chars, showAll);
 
   document.getElementById('appContent').innerHTML = `<div class="full-panel">
     <div class="search-wrap" style="margin-bottom:10px">
@@ -2121,7 +2300,7 @@ function renderFavorsTab() {
             <th>NPC</th>
             ${showAll ? charHeaders : '<th>Favor</th>'}
           </tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody id="favorTbody">${rows}</tbody>
         </table>`}
   </div>`;
 }
@@ -2513,9 +2692,16 @@ function buildRecipeRows(displayList, allRecipeKeys) {
     if (dataLoaded.npcs && npcSources.length > 0) {
       const npcDetails = npcSources.map(s => {
         const npc = NPCS[s.npc]; if (!npc) return '';
-        const trainingService = npc.services?.find(sv => sv.type === 'Training');
-        const reqFavor = trainingService?.favor || '—';
-        return `<span style="font-size:10px;color:var(--text-dim)">${npc.name}: <span style="color:var(--text)">${npc.area}</span> · favor needed: <span style="color:${FAVOR_COLOR(reqFavor)}">${reqFavor}</span></span>`;
+        // For Training, use per-recipe favor from NPC_TRAINING; fall back to service-level favor
+        const perRecipeEntry = s.t === 'Training' && dataLoaded.npc_training
+          ? NPC_TRAINING[s.npc]?.find(e => e.recipeKey === k) : null;
+        const reqFavor = perRecipeEntry?.favor
+          || npc.services?.find(sv => sv.type === 'Training' || sv.type === 'HangOut')?.favor
+          || '—';
+        const favorLabel = FAVOR_LABELS[reqFavor] || reqFavor;
+        const costStr = perRecipeEntry?.cost != null
+          ? ` · <span style="color:var(--gold)">${perRecipeEntry.cost.toLocaleString()} 🪙</span>` : '';
+        return `<span style="font-size:10px;color:var(--text-dim)">${npc.name}: <span style="color:var(--text)">${npc.area}</span> · favor needed: <span style="color:${FAVOR_COLOR(reqFavor)}">${favorLabel}</span>${costStr}</span>`;
       }).filter(Boolean).join('<br>');
       if (npcDetails) npcDetailHtml = `<div style="margin-top:3px">${npcDetails}</div>`;
     }
@@ -2530,7 +2716,7 @@ function buildRecipeRows(displayList, allRecipeKeys) {
           const iconId = ITEMS_ICONS[String(ingId)];
           const iconUrl = iconId ? getIconUrl(iconId) : null;
           const iconHtml = iconUrl ? `<img class="item-icon" src="${iconUrl}" alt="" style="width:14px;height:14px;margin-right:4px;vertical-align:middle">` : '';
-          const srcBadges = renderItemSources(ingId, 4, `rec_${k}`);
+          const srcBadges = renderItemSources(ingId, 4, `rec_${k}`, ['NpcGift']);
           const chanceHtml = chance != null ? `<span style="font-size:10px;color:var(--orange);margin-left:4px">${Math.round(chance*100)}% consumed</span>` : '';
           return `<div style="display:flex;align-items:flex-start;gap:4px;padding:2px 0">
             <span style="font-size:11px;color:var(--text-dim);white-space:nowrap;min-width:14px">${qty}×</span>
@@ -2913,7 +3099,14 @@ function setQuestLocationFilter(loc) {
   questLocationFilter = questLocationFilter === loc ? '' : loc;
   renderQuestsTab();
 }
-function onQuestSearch(v) { questSearchQ = v; renderQuestsTab(); }
+function onQuestSearch(v) {
+  questSearchQ = v;
+  renderQuestsTab();
+  setTimeout(() => {
+    const el = document.querySelector('#appContent .search-input[placeholder="Search quests…"]');
+    if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }, 10);
+}
 function clearQuestSearch() { questSearchQ = ''; renderQuestsTab(); }
 function navigateToQuest(questName) { questSearchQ = questName; questLocationFilter = ''; setMainTab('quests'); }
 
@@ -3037,6 +3230,19 @@ function renderQuestsTab() {
         ? `<span class="quest-obj-desc quest-item-link" style="flex:1" title="Click to view recipe" onclick="goToRecipe('${safeN}')">${iName} 🔗</span>`
         : `<span class="quest-obj-desc" style="flex:1">${iName}</span>`;
 
+      // Vault storage info — skip if craftable and have none
+      let vaultHtml = '';
+      if (have > 0 && !(isCraftable && have === 0)) {
+        const vaultChars = showAll ? characters : qChars;
+        const vaultsMap = getQuestItemVaults(obj.tid, vaultChars);
+        if (vaultsMap) {
+          const tags = Object.entries(vaultsMap)
+            .map(([v, q]) => `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:10px;color:var(--text-dim);white-space:nowrap">${v}<span style="color:var(--gold-dim)">×${q}</span></span>`)
+            .join('');
+          vaultHtml = `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${tags}</div>`;
+        }
+      }
+
       return `<div class="quest-obj-row">
         <div class="quest-obj-bar-wrap">
           <div style="display:flex;align-items:center;margin-bottom:3px">
@@ -3046,6 +3252,7 @@ function renderQuestsTab() {
           <div class="wo-bar-wrap" style="height:4px">
             <div class="wo-bar ${barCls}" style="width:${pct}%"></div>
           </div>
+          ${vaultHtml}
         </div>
       </div>`;
     }).join('');
@@ -3099,6 +3306,7 @@ const DATA_FILES = [
   { key:'vaults',          file:'pg_storagevaults.json',   cdn:'storagevaults.json',   label:'Storage Vaults Database', desc:'Vault slot counts and NPC levels' },
   { key:'quests',          file:'pg_quests.json',          cdn:'quests.json',          label:'Quests Database',         desc:'Quest objectives and locations' },
   { key:'landmarks',       file:'pg_landmarks.json',       cdn:null,                   label:'Landmarks Database',      desc:'Portals, pillars, and map points of interest' },
+  { key:'npc_training',   file:'pg_npc_training.json',    cdn:null,                   label:'NPC Training Database',   desc:'Per-recipe favor level and cost for trainers' },
 ];
 
 // ── Icon system ──
