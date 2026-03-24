@@ -14,7 +14,6 @@ from dataclasses import asdict
 from typing import List, Optional, Set
 
 import websockets
-from qasync import asyncSlot
 
 from config import Config
 from chat_watcher import ChatWatcher
@@ -89,8 +88,11 @@ class SurveyServer:
 
     async def run(self):
         """Top-level coroutine started from main.pyw."""
-        # Connect click watcher signal via asyncSlot
-        self.click_watcher.double_clicked_slot.connect(self._on_inv_double_click)
+        # Connect click watcher signal — use lambda so asyncio.ensure_future
+        # schedules the coroutine; @asyncSlot doesn't work with typed signals.
+        self.click_watcher.double_clicked_slot.connect(
+            lambda slot: asyncio.ensure_future(self._on_inv_double_click(slot))
+        )
 
         log.info("Starting WebSocket server on ws://%s:%d", WS_HOST, WS_PORT)
         async with websockets.serve(self._handle_client, WS_HOST, WS_PORT):
@@ -258,10 +260,18 @@ class SurveyServer:
 
         # Start chat watcher
         self.chat_watcher = ChatWatcher(self.config.chat_log_dir, skip_existing=True)
-        self.chat_watcher.survey_detected.connect(self._on_survey_detected)
-        self.chat_watcher.survey_completed.connect(self._on_survey_completed)
-        self.chat_watcher.area_changed.connect(self._on_area_detected)
-        self.chat_watcher.error_occurred.connect(self._on_watch_error)
+        self.chat_watcher.survey_detected.connect(
+            lambda name, e, s: asyncio.ensure_future(self._on_survey_detected(name, e, s))
+        )
+        self.chat_watcher.survey_completed.connect(
+            lambda name: asyncio.ensure_future(self._on_survey_completed(name))
+        )
+        self.chat_watcher.area_changed.connect(
+            lambda area: asyncio.ensure_future(self._on_area_detected(area))
+        )
+        self.chat_watcher.error_occurred.connect(
+            lambda msg: asyncio.ensure_future(self._on_watch_error(msg))
+        )
         self.chat_watcher.start()
 
         await self.broadcast({
@@ -296,7 +306,6 @@ class SurveyServer:
     # Chat watcher callbacks  (Qt signals → asyncio via qasync)
     # ------------------------------------------------------------------
 
-    @asyncSlot(str, int, int)
     async def _on_survey_detected(self, item_name: str, east: int, south: int):
         if self._setup_complete:
             # Route mode: coordinate hint — find closest unvisited location
@@ -345,7 +354,6 @@ class SurveyServer:
                 "status": f"Duplicate skipped: {east:+d}E, {south:+d}S",
             })
 
-    @asyncSlot(str)
     async def _on_survey_completed(self, item_name: str):
         if not self._setup_complete or self._pending_visit_loc is None:
             return
@@ -356,7 +364,6 @@ class SurveyServer:
             self._pending_timeout_handle = None
         await self._mark_location_visited(loc)
 
-    @asyncSlot(str)
     async def _on_area_detected(self, area: str):
         self.config.active_area = area
         await self.broadcast({
@@ -365,7 +372,6 @@ class SurveyServer:
             "status": f"Area detected: {area}",
         })
 
-    @asyncSlot(str)
     async def _on_watch_error(self, msg: str):
         await self.broadcast({"type": "error", "message": f"Chat watcher: {msg}"})
 
@@ -373,7 +379,6 @@ class SurveyServer:
     # Inventory double-click  (Win32 hook → asyncio)
     # ------------------------------------------------------------------
 
-    @asyncSlot(int)
     async def _on_inv_double_click(self, slot_index: int):
         if self._pending_visit_loc is not None:
             return
