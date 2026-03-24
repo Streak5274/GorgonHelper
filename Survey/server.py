@@ -20,6 +20,7 @@ from route_solver import nearest_neighbor_route
 from ui_inventory_overlay import InventoryOverlay
 from ui_game_map_overlay import GameMapOverlay
 from ui_region_selector import RegionSelector
+from ui_region_highlighter import RegionHighlighter
 from inventory_click_watcher import InventoryClickWatcher
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [Survey] %(message)s")
@@ -76,6 +77,9 @@ class SurveyServer:
 
         # Region selector overlay (keep reference so Qt doesn't GC it)
         self._region_selector: Optional[RegionSelector] = None
+
+        # Region highlighter — transparent border shown while editing coords
+        self._highlighter = RegionHighlighter()
 
         # Apply saved map region if configured
         if self.config.map_capture.w > 0:
@@ -214,7 +218,15 @@ class SurveyServer:
             await self._send_state_full()
         elif t == "cmd_capture_screenshot":
             purpose = msg.get("purpose", "inventory")
+            self._highlighter.hide_region()
             self._launch_region_selector(purpose)
+        elif t == "cmd_highlight_region":
+            self._highlighter.show_region(
+                int(msg.get("x", 0)), int(msg.get("y", 0)),
+                int(msg.get("w", 0)), int(msg.get("h", 0)),
+            )
+        elif t == "cmd_hide_highlight":
+            self._highlighter.hide_region()
         elif t == "cmd_update_config":
             await self._update_config(msg)
         elif t == "cmd_ping":
@@ -643,9 +655,18 @@ class SurveyServer:
         if "inventory" in msg:
             inv_data = msg["inventory"]
             inv = self.config.inventory
-            for field in ("grid_cols", "grid_rows", "slot_gap", "padding_left", "padding_top"):
+            for field in ("screen_x", "screen_y", "slot_width", "slot_height",
+                          "grid_cols", "grid_rows", "slot_gap", "padding_left", "padding_top"):
                 if field in inv_data:
                     setattr(inv, field, int(inv_data[field]))
+        if "map_capture" in msg:
+            mc_data = msg["map_capture"]
+            mc = self.config.map_capture
+            for field in ("x", "y", "w", "h"):
+                if field in mc_data:
+                    setattr(mc, field, int(mc_data[field]))
+            if mc.w > 0:
+                self.map_overlay.configure_region(mc.x, mc.y, mc.w, mc.h)
         if "chat_log_dir" in msg:
             self.config.chat_log_dir = msg["chat_log_dir"]
         if "player_east" in msg:

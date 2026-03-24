@@ -4195,16 +4195,30 @@ function renderSurveyTab() {
           <span>⚙ Settings</span><span style="font-size:10px">▾</span>
         </div>
         <div id="surveySettings" style="display:none;padding:12px 16px 16px;display:flex;flex-direction:column;gap:14px">
-          <div style="display:flex;flex-wrap:wrap;gap:16px">
-            <div>
-              <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Inventory region</div>
-              <button class="ctx-btn" onclick="surveySend({type:'cmd_capture_screenshot',purpose:'inventory'})">Select first slot on screen</button>
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Map region</div>
-              <button class="ctx-btn" onclick="surveySend({type:'cmd_capture_screenshot',purpose:'map'})">Select map region on screen</button>
-            </div>
-          </div>
+          ${['inventory','map'].map(purpose => {
+            const isInv = purpose === 'inventory';
+            const cfg   = isInv ? (surveyConfig.inventory || {}) : (surveyConfig.map_capture || {});
+            const fields = isInv
+              ? [{k:'screen_x',  lbl:'X'}, {k:'screen_y',    lbl:'Y'}, {k:'slot_width', lbl:'W'}, {k:'slot_height',lbl:'H'}]
+              : [{k:'x',         lbl:'X'}, {k:'y',            lbl:'Y'}, {k:'w',          lbl:'W'}, {k:'h',          lbl:'H'}];
+            const label = isInv ? 'Inventory region (first slot)' : 'Map region';
+            const btnTxt = isInv ? 'Select first slot on screen' : 'Select map region on screen';
+            return `<div>
+              <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">${label}</div>
+              <button class="ctx-btn" onclick="surveySend({type:'cmd_capture_screenshot',purpose:'${purpose}'})">⊞ ${btnTxt}</button>
+              <div style="display:flex;gap:5px;margin-top:7px">
+                ${fields.map(({k, lbl}) => `
+                <label style="display:flex;flex-direction:column;gap:2px;align-items:center">
+                  <span style="font-size:9px;color:var(--text-dim);letter-spacing:.05em">${lbl}</span>
+                  <input type="number" value="${cfg[k] ?? 0}"
+                    style="width:60px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:2px 5px;border-radius:3px;font-size:11px;text-align:right"
+                    onfocus="surveyRegionFocus('${purpose}')"
+                    onblur="surveyRegionBlur()"
+                    oninput="surveyRegionInput('${purpose}','${k}',+this.value)">
+                </label>`).join('')}
+              </div>
+            </div>`;
+          }).join('')}
         </div>
       </div>
     </div>
@@ -4396,6 +4410,46 @@ function surveyDrawCanvas() {
 
 // ── Region selector overlay ───────────────────────────────
 
+
+// ------------------------------------------------------------------
+// Survey region highlight helpers
+// ------------------------------------------------------------------
+let _surveyHighlightBlurTimer = null;
+
+function surveyRegionFocus(purpose) {
+  clearTimeout(_surveyHighlightBlurTimer);
+  const inv = surveyConfig.inventory || {};
+  const mc  = surveyConfig.map_capture || {};
+  const r   = purpose === 'inventory'
+    ? { x: inv.screen_x|0, y: inv.screen_y|0, w: inv.slot_width|0, h: inv.slot_height|0 }
+    : { x: mc.x|0,         y: mc.y|0,         w: mc.w|0,           h: mc.h|0 };
+  surveySend({ type: 'cmd_highlight_region', ...r });
+}
+
+function surveyRegionBlur() {
+  // Short delay so switching between sibling inputs doesn't flicker
+  _surveyHighlightBlurTimer = setTimeout(() => {
+    surveySend({ type: 'cmd_hide_highlight' });
+  }, 300);
+}
+
+function surveyRegionInput(purpose, field, value) {
+  clearTimeout(_surveyHighlightBlurTimer);
+  // Update local cache
+  if (purpose === 'inventory') {
+    if (!surveyConfig.inventory) surveyConfig.inventory = {};
+    surveyConfig.inventory[field] = value;
+    const inv = surveyConfig.inventory;
+    surveySend({ type: 'cmd_highlight_region', x: inv.screen_x|0, y: inv.screen_y|0, w: inv.slot_width|0, h: inv.slot_height|0 });
+    surveySend({ type: 'cmd_update_config', inventory: { [field]: value } });
+  } else {
+    if (!surveyConfig.map_capture) surveyConfig.map_capture = {};
+    surveyConfig.map_capture[field] = value;
+    const mc = surveyConfig.map_capture;
+    surveySend({ type: 'cmd_highlight_region', x: mc.x|0, y: mc.y|0, w: mc.w|0, h: mc.h|0 });
+    surveySend({ type: 'cmd_update_config', map_capture: { [field]: value } });
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 // INIT
