@@ -420,9 +420,6 @@ let surveyStatus = '';
 let surveyConfig = {};
 let surveyPlayerMeters = null;
 let surveyCirclePins = [];
-let surveyRegionMode = null;
-let surveyScreenshotData = null;
-let surveyScreenshotDims = null;
 
 // Game data (loaded from files)
 const APP_VERSION = '0.1.4';
@@ -4116,12 +4113,6 @@ function surveyHandleMessage(msg) {
       surveyCirclePins.push({px: msg.pixel_x, py: msg.pixel_y});
       if (mainTab === 'survey') surveyDrawCanvas();
       break;
-    case 'screenshot':
-      surveyRegionMode = msg.purpose;
-      surveyScreenshotData = msg.data;
-      surveyScreenshotDims = {width: msg.width, height: msg.height};
-      if (mainTab === 'survey') renderSurveyRegionSelector();
-      break;
     case 'status':
     case 'error':
     case 'pong':
@@ -4409,84 +4400,6 @@ function surveyDrawCanvas() {
 
 // ── Region selector overlay ───────────────────────────────
 
-let _surveyDragStart = null;
-let _surveyDragEnd = null;
-let _surveyImgRect = null;
-
-function renderSurveyRegionSelector() {
-  // Remove any existing selector
-  document.getElementById('surveyRegionOverlay')?.remove();
-
-  if (!surveyScreenshotData) return;
-
-  const purpose = surveyRegionMode === 'inventory' ? 'first inventory slot' : 'map region';
-  const overlay = document.createElement('div');
-  overlay.id = 'surveyRegionOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:600;background:#000;cursor:crosshair;user-select:none';
-  overlay.innerHTML = `
-    <img id="surveyRegionImg" src="data:image/jpeg;base64,${surveyScreenshotData}"
-      style="width:100%;height:100%;object-fit:contain;display:block">
-    <div style="position:absolute;inset:0;background:rgba(0,0,0,.4);pointer-events:none"></div>
-    <div id="surveyRegionRect" style="position:absolute;border:2px solid #ffd700;pointer-events:none;display:none"></div>
-    <div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:8px 20px;border-radius:6px;font-family:'Cinzel',serif;font-size:12px;pointer-events:none">
-      Drag to select ${purpose} — <span style="color:#ffd700">ESC</span> to cancel
-    </div>`;
-  document.body.appendChild(overlay);
-
-  _surveyDragStart = null;
-  _surveyDragEnd = null;
-
-  overlay.addEventListener('mousedown', e => {
-    e.preventDefault();
-    _surveyImgRect = document.getElementById('surveyRegionImg').getBoundingClientRect();
-    _surveyDragStart = {x: e.clientX, y: e.clientY};
-    _surveyDragEnd = null;
-  });
-
-  overlay.addEventListener('mousemove', e => {
-    if (!_surveyDragStart) return;
-    _surveyDragEnd = {x: e.clientX, y: e.clientY};
-    const rect = document.getElementById('surveyRegionRect');
-    if (rect) {
-      const l = Math.min(_surveyDragStart.x, e.clientX);
-      const t = Math.min(_surveyDragStart.y, e.clientY);
-      const w = Math.abs(e.clientX - _surveyDragStart.x);
-      const h = Math.abs(e.clientY - _surveyDragStart.y);
-      rect.style.cssText = `position:absolute;border:2px solid #ffd700;pointer-events:none;left:${l}px;top:${t}px;width:${w}px;height:${h}px`;
-    }
-  });
-
-  overlay.addEventListener('mouseup', e => {
-    if (!_surveyDragStart || !_surveyDragEnd) return;
-    // Map CSS coords → screenshot pixel coords
-    const img = document.getElementById('surveyRegionImg');
-    const ir = img.getBoundingClientRect();
-    const scaleX = surveyScreenshotDims.width / ir.width;
-    const scaleY = surveyScreenshotDims.height / ir.height;
-    const x1 = (Math.min(_surveyDragStart.x, e.clientX) - ir.left) * scaleX;
-    const y1 = (Math.min(_surveyDragStart.y, e.clientY) - ir.top) * scaleY;
-    const x2 = (Math.max(_surveyDragStart.x, e.clientX) - ir.left) * scaleX;
-    const y2 = (Math.max(_surveyDragStart.y, e.clientY) - ir.top) * scaleY;
-    const w = x2 - x1, h = y2 - y1;
-    if (w < 4 || h < 4) return;
-    surveySend({type:'cmd_set_region', purpose:surveyRegionMode, x:Math.round(x1), y:Math.round(y1), w:Math.round(w), h:Math.round(h)});
-    surveyCloseRegionSelector();
-    showToast(`Region saved (${Math.round(w)}×${Math.round(h)} px)`);
-  });
-
-  document.addEventListener('keydown', _surveyEscListener);
-}
-
-function _surveyEscListener(e) {
-  if (e.key === 'Escape') surveyCloseRegionSelector();
-}
-
-function surveyCloseRegionSelector() {
-  document.getElementById('surveyRegionOverlay')?.remove();
-  document.removeEventListener('keydown', _surveyEscListener);
-  surveyScreenshotData = null;
-  surveyRegionMode = null;
-}
 
 // ═══════════════════════════════════════════════════════════
 // INIT
