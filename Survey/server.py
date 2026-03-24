@@ -201,8 +201,12 @@ class SurveyServer:
             self._route_id_order = []
             self._route_mapped = []
             self._current_slot_labels = {}
+            self._pending_visit_loc = None
             self.map_overlay.clear_circle_pins()
             self.map_overlay.update_survey_data([], [])
+            self.map_overlay.set_visible(False)
+            self.inv_overlay.set_overlay_visible(False)
+            self.click_watcher.stop()
             await self._send_state_full()
         elif t == "cmd_capture_screenshot":
             purpose = msg.get("purpose", "inventory")
@@ -308,7 +312,11 @@ class SurveyServer:
 
     async def _on_survey_detected(self, item_name: str, east: int, south: int):
         if self._setup_complete:
-            # Route mode: coordinate hint — find closest unvisited location
+            # Route mode: coordinate hint — only set pending if not already set
+            # by a slot double-click. Overwriting causes the wrong location to be
+            # marked when surveys are used back-to-back faster than 10 seconds.
+            if self._pending_visit_loc is not None:
+                return
             east_abs = self.config.player_east + east
             south_abs = self.config.player_south + south
             best_loc = None
@@ -551,8 +559,12 @@ class SurveyServer:
         self._route_id_order = []
         self._route_mapped = []
         self._current_slot_labels = {}
+        self._pending_visit_loc = None
         self.map_overlay.clear_circle_pins()
         self.map_overlay.update_survey_data([], [])
+        self.map_overlay.set_visible(False)
+        self.inv_overlay.set_overlay_visible(False)
+        self.click_watcher.stop()
         await self._send_state_full()
 
     # ------------------------------------------------------------------

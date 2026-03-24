@@ -4018,6 +4018,33 @@ function surveyConnect() {
   }
 }
 
+async function surveyLaunch() {
+  const btn = document.getElementById('surveyLaunchBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Starting…'; }
+  try {
+    const res = await fetch('/api/start-survey', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'launched') {
+      showToast('Survey Helper starting…');
+      // Give it a moment to bind the port, then start connecting
+      setTimeout(surveyConnect, 1500);
+    } else if (data.status === 'already_running') {
+      showToast('Already running — reconnecting…');
+      surveyConnect();
+    } else if (data.status === 'not_found') {
+      showToast('Survey/main.pyw not found', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '▶ Start Survey Helper'; }
+    } else {
+      showToast('Error: ' + (data.message || data.status), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '▶ Start Survey Helper'; }
+    }
+  } catch(e) {
+    // fetch failed — start_server.py not running, fall back to manual instructions
+    showToast('Could not reach server — start py start_server.py first', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Start Survey Helper'; }
+  }
+}
+
 function surveySend(obj) {
   if (surveyWs && surveyWs.readyState === WebSocket.OPEN) surveyWs.send(JSON.stringify(obj));
 }
@@ -4105,16 +4132,22 @@ function renderSurveyTab() {
   <div style="font-family:'Cinzel',serif;font-size:18px;color:var(--gold);margin-bottom:12px">Survey Helper Not Running</div>
   <div style="color:var(--text-dim);font-size:13px;line-height:1.7;margin-bottom:24px">
     The Survey Helper is a Python background process that watches your game's chat log,
-    highlights inventory slots, and shows the optimal route overlay on your game map.<br><br>
-    To start it, open a terminal in the <code style="background:var(--bg3);padding:1px 6px;border-radius:3px">Survey\\</code> folder and run:
+    highlights inventory slots, and shows the optimal route overlay on your game map.
   </div>
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 20px;font-family:monospace;font-size:14px;color:var(--gold);margin-bottom:20px;cursor:pointer;user-select:all" onclick="navigator.clipboard?.writeText('py main.pyw');showToast('Copied!')">
-    py main.pyw
-  </div>
-  <button class="sync-btn" onclick="surveyConnect()" style="font-size:13px;padding:8px 22px">
-    ⟳ Retry Connection
+  <button id="surveyLaunchBtn" class="sync-btn" onclick="surveyLaunch()" style="font-size:14px;padding:10px 28px;background:var(--gold-dim);border-color:var(--gold);color:var(--gold);margin-bottom:16px">
+    ▶ Start Survey Helper
   </button>
-  <div style="font-size:11px;color:var(--text-dim);margin-top:12px">
+  <div style="color:var(--text-dim);font-size:11px;margin-bottom:20px">
+    Launches <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">Survey/main.pyw</code> silently in the background.<br>
+    Requires <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">py start_server.py</code> to be running instead of <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">py -m http.server</code>.
+  </div>
+  <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">Or start manually:</div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 18px;font-family:monospace;font-size:13px;color:var(--gold);cursor:pointer;user-select:all;display:inline-block" onclick="navigator.clipboard?.writeText('py main.pyw');showToast('Copied!')">
+      py main.pyw
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--text-dim);margin-top:16px">
     Connecting to ws://localhost:8765 — retrying automatically every 3 s
   </div>
 </div>`;
