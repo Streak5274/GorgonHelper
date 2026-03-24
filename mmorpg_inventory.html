@@ -4162,8 +4162,6 @@ function renderSurveyTab() {
     return;
   }
 
-  const areaDisplay = surveyActiveArea.replace(/^Area/, '');
-
   el.innerHTML = `
 <div style="display:flex;flex-direction:column;height:calc(100vh - 100px)">
 
@@ -4175,8 +4173,6 @@ function renderSurveyTab() {
     }
     <button class="sync-btn" onclick="surveySend({type:'cmd_recalculate_route'})">↺ Recalculate Route</button>
     <button class="sync-btn" onclick="surveySend({type:'cmd_clear_area'})" style="color:var(--text-dim)">✕ Clear Area</button>
-    <span style="margin-left:auto;font-size:12px;color:var(--text-dim);font-family:'Cinzel',serif">${areaDisplay}</span>
-    <span style="width:8px;height:8px;border-radius:50%;background:#4c4;display:inline-block;flex-shrink:0" title="Connected"></span>
   </div>
 
   <!-- Body -->
