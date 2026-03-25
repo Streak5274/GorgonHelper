@@ -76,6 +76,9 @@ class SurveyServer:
         # WebSocket clients
         self._clients: Set[websockets.WebSocketServerProtocol] = set()
 
+        # Clean shutdown signal — set by cmd_shutdown to exit run() normally
+        self._shutdown_event = asyncio.Event()
+
         # Region selector overlay (keep reference so Qt doesn't GC it)
         self._region_selector: Optional[RegionSelector] = None
 
@@ -104,7 +107,10 @@ class SurveyServer:
         log.info("Starting WebSocket server on ws://%s:%d", WS_HOST, WS_PORT)
         async with websockets.serve(self._handle_client, WS_HOST, WS_PORT):
             log.info("Survey Helper running — waiting for browser connection")
-            await asyncio.Future()  # run forever
+            await self._shutdown_event.wait()  # run until cmd_shutdown sets this
+
+        log.info("WebSocket server closed — exiting")
+        QApplication.quit()
 
     # ------------------------------------------------------------------
     # WebSocket handling
@@ -234,8 +240,8 @@ class SurveyServer:
             await self._send(ws, {"type": "pong"})
         elif t == "cmd_shutdown":
             await self._send(ws, {"type": "shutdown_ack"})
-            logging.info("Shutdown requested by browser")
-            QApplication.quit()
+            log.info("Shutdown requested by browser")
+            self._shutdown_event.set()  # lets run() exit async with cleanly
 
     # ------------------------------------------------------------------
     # Setup / Stop
