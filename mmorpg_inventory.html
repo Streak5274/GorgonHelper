@@ -3511,6 +3511,45 @@ function updateIconDownloadProgress(done, total, skipped, failed) {
 
 function updateSettingsStatus() { if (mainTab==='settings') renderSettingsTab(); }
 
+async function checkForUpdate() {
+  const btn = document.getElementById('updateCheckBtn');
+  const status = document.getElementById('updateStatus');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Checking…';
+  try {
+    const res = await fetch('/api/check-update');
+    const data = await res.json();
+    if (data.error) {
+      if (status) status.innerHTML = `<span style="color:var(--red)">Could not reach GitHub: ${data.error}</span>`;
+    } else if (data.upToDate) {
+      if (status) status.innerHTML = `<span style="color:var(--green)">✓ Up to date (v${data.local})</span>`;
+    } else {
+      if (status) status.innerHTML = `<span style="color:var(--gold)">Update available: v${data.local} → v${data.remote}</span>
+        <button class="ctx-btn" onclick="doUpdate()" style="margin-left:8px">⬇ Update &amp; Reload</button>`;
+    }
+  } catch(e) {
+    if (status) status.innerHTML = `<span style="color:var(--text-dim)">start_server.py not running — updates require it</span>`;
+  }
+  if (btn) btn.disabled = false;
+}
+
+async function doUpdate() {
+  const status = document.getElementById('updateStatus');
+  if (status) status.innerHTML = `<span style="color:var(--text-dim)">Updating…</span>`;
+  try {
+    const res = await fetch('/api/update', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      if (status) status.innerHTML = `<span style="color:var(--green)">✓ Updated — reloading…</span>`;
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      if (status) status.innerHTML = `<span style="color:var(--red)">Update failed: ${data.output}</span>`;
+    }
+  } catch(e) {
+    if (status) status.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
 function renderSettingsTab() {
   const rowsHtml = DATA_FILES.map(df => {
     const loaded = dataLoaded[df.key];
@@ -3601,6 +3640,10 @@ function renderSettingsTab() {
         ? `<span style="font-size:11px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:2px 7px;color:var(--text-dim)" title="${df.file}">${df.label.replace(' Database','').replace(' Sources','').replace(' Database','')} v${dataVersions[df.key]}</span>`
         : ''
       ).filter(Boolean).join('')}
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+      <button class="ctx-btn" onclick="checkForUpdate()" id="updateCheckBtn">Check for updates</button>
+      <span id="updateStatus" style="font-size:12px;color:var(--text-dim)"></span>
     </div>
   </div>
 
