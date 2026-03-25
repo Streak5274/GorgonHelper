@@ -2405,6 +2405,7 @@ function hideNpcPrefTooltip() {
 // ═══════════════════════════════════════════════════════════
 let recipeSkillFilter = '';
 let recipeSearchQ = '';
+let recipeSkillSort = null; // null | 'asc' | 'desc'
 
 let recipeShowLocked = 'known'; // 'known' | 'locked' | 'all'
 let vaultAreaFilter = '';
@@ -2690,7 +2691,7 @@ function buildRecipeRows(displayList, allRecipeKeys) {
 
     if (!expanded) {
       return `<tr class="recipe-row" style="cursor:pointer" onclick="toggleRecipeRow('${safeK}')">
-        <td><div style="display:flex;align-items:center;gap:4px">${recipeIconHtml}<span class="recipe-name">${rName}</span><span style="font-size:11px;color:var(--text-dim);margin-left:4px">▼</span></div></td>
+        <td><div style="display:flex;align-items:center;gap:4px">${recipeIconHtml}<span class="recipe-name">${rName}</span>${cookingKwTag(r)}<span style="font-size:11px;color:var(--text-dim);margin-left:4px">▼</span></div></td>
         <td><span class="recipe-skill-tag">${rSkill}</span>${skillLevelReq > 0 ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">Lv.${skillLevelReq}</span>` : ''}</td>
         <td style="white-space:nowrap">${charStack}</td>
       </tr>`;
@@ -2758,6 +2759,7 @@ function buildRecipeRows(displayList, allRecipeKeys) {
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:6px">
               <span class="recipe-name">${rName}</span>
+              ${cookingKwTag(r)}
               <span style="font-size:11px;color:var(--text-dim);cursor:pointer">▲</span>
             </div>
             <div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:2px" onclick="event.stopPropagation()">${sourceBadges}</div>
@@ -2780,9 +2782,13 @@ function getRecipeDisplayList() {
   if (recipeSearchQ) pool = pool.filter(([,r])=>r[0].toLowerCase().includes(recipeSearchQ.toLowerCase()));
   const known  = pool.filter(([k])=>allRecipeKeys.has(k));
   const locked = pool.filter(([k])=>!allRecipeKeys.has(k));
-  const display = recipeShowLocked === 'all' ? pool
-                : recipeShowLocked === 'locked' ? locked
-                : known;
+  let display = recipeShowLocked === 'all' ? pool
+              : recipeShowLocked === 'locked' ? locked
+              : known;
+  if (recipeSkillSort) {
+    const dir = recipeSkillSort === 'asc' ? 1 : -1;
+    display = [...display].sort(([,a],[,b]) => dir * (a[1]||'').localeCompare(b[1]||''));
+  }
   return { known, locked, display, allRecipeKeys };
 }
 
@@ -2825,7 +2831,7 @@ function renderRecipesTab() {
       ${display.length===0
         ? `<div class="empty-state" id="recipeEmpty"><div class="icon">📖</div><h3>No recipes found</h3></div>`
         : `<table class="recipe-table">
-            <thead><tr><th>Recipe</th><th>Skill</th><th>Characters</th></tr></thead>
+            <thead><tr><th>Recipe</th><th style="cursor:pointer;user-select:none" onclick="cycleRecipeSkillSort()" id="recipeSkillTh">Skill ${recipeSkillSort==='asc'?'▲':recipeSkillSort==='desc'?'▼':'⇅'}</th><th>Characters</th></tr></thead>
             <tbody id="recipeTableBody">${buildRecipeRows(display, allRecipeKeys)}</tbody>
           </table>`}
     </div>
@@ -2852,12 +2858,14 @@ function updateRecipeBody(display, allRecipeKeys, knownCount, lockedCount) {
     wrap.innerHTML = `<div class="empty-state" id="recipeEmpty"><div class="icon">📖</div><h3>No recipes found</h3></div>`;
     return;
   }
+  const thEl = document.getElementById('recipeSkillTh');
+  if (thEl) thEl.textContent = `Skill ${recipeSkillSort==='asc'?'▲':recipeSkillSort==='desc'?'▼':'⇅'}`;
   const tbody = document.getElementById('recipeTableBody');
   if (tbody) {
     tbody.innerHTML = buildRecipeRows(display, allRecipeKeys);
   } else {
     // Table didn't exist before (was showing empty state), rebuild fully
-    wrap.innerHTML = `<table class="recipe-table"><thead><tr><th>Recipe</th><th>Skill</th><th>Characters</th></tr></thead><tbody id="recipeTableBody">${buildRecipeRows(display, allRecipeKeys)}</tbody></table>`;
+    wrap.innerHTML = `<table class="recipe-table"><thead><tr><th>Recipe</th><th style="cursor:pointer;user-select:none" onclick="cycleRecipeSkillSort()" id="recipeSkillTh">Skill ${recipeSkillSort==='asc'?'▲':recipeSkillSort==='desc'?'▼':'⇅'}</th><th>Characters</th></tr></thead><tbody id="recipeTableBody">${buildRecipeRows(display, allRecipeKeys)}</tbody></table>`;
   }
 }
 
@@ -2878,6 +2886,17 @@ function onRecipeSearch(v) {
 }
 function clearRecipeSearch() { recipeSearchQ = ''; renderRecipesTab(); }
 function onRecipeSkillFilter(v) { recipeSkillFilter = v; renderRecipesTab(); }
+function cycleRecipeSkillSort() {
+  recipeSkillSort = recipeSkillSort === null ? 'asc' : recipeSkillSort === 'asc' ? 'desc' : null;
+  const { known, locked, display, allRecipeKeys } = getRecipeDisplayList();
+  updateRecipeBody(display, allRecipeKeys, known.length, locked.length);
+}
+function cookingKwTag(r) {
+  const kw = r[5];
+  if (!kw) return '';
+  const isMeal = kw === 'Meal';
+  return `<span style="font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid ${isMeal?'#7a9e6a':'#c4a24a'};background:${isMeal?'rgba(122,158,106,.15)':'rgba(196,162,74,.15)'};color:${isMeal?'#8fbb7a':'#d4b45a'};font-family:sans-serif;letter-spacing:.03em;vertical-align:middle;margin-left:5px">${kw}</span>`;
+}
 
 // ═══════════════════════════════════════════════════════════
 // STORAGE VAULTS TAB
