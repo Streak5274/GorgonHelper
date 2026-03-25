@@ -542,6 +542,11 @@ class SurveyServer:
                 "status": f"Duplicate skipped: {east:+d}E, {south:+d}S",
             })
 
+    @staticmethod
+    def _normalize_item_name(name: str) -> str:
+        """Strip leading 'The '/'A '/'An ' and lowercase for loose comparison."""
+        return name.lower().removeprefix("the ").removeprefix("a ").removeprefix("an ").strip()
+
     async def _on_survey_completed(self, item_name: str):
         log.debug("COMPLETED item=%r  pending=%s",
                   item_name,
@@ -550,6 +555,12 @@ class SurveyServer:
         if not self._setup_complete or self._pending_visit_loc is None:
             return
         loc = self._pending_visit_loc
+        # Guard: only mark if the completed item matches the pending survey item.
+        # Enemy loot also fires survey_completed ("You receive Hops") — reject those.
+        if self._normalize_item_name(item_name) != self._normalize_item_name(loc.item_name):
+            log.debug("COMPLETED item=%r doesn't match pending %r — ignoring (enemy loot?)",
+                      item_name, loc.item_name)
+            return
         self._pending_visit_loc = None
         if self._pending_timeout_handle:
             self._pending_timeout_handle.cancel()
