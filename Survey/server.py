@@ -674,6 +674,7 @@ class SurveyServer:
         count = 0
         log.info("AUTO-USE  starting from slot %d", self._current_scan_slot)
         await self.broadcast({"type": "status", "message": "Auto-use: starting…"})
+        self.map_overlay.set_fast_scan(True)   # 120ms instead of 600ms
 
         CHAT_TIMEOUT = 7.0   # seconds to wait for survey_detected (chat log)
         PIN_TIMEOUT  = 8.0   # seconds to wait for circle_pin_added (map OCR)
@@ -711,6 +712,7 @@ class SurveyServer:
             self._auto_use_active = False
             self._auto_use_event = None
             self._auto_use_pin_event = None
+            self.map_overlay.set_fast_scan(False)  # back to 600ms
 
     def _slot_screen_center(self, slot_index: int):
         """Return (screen_x, screen_y) of the centre of an inventory slot."""

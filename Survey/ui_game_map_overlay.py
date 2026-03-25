@@ -48,8 +48,10 @@ def _find_red_circle(arr: np.ndarray) -> Optional[Tuple[int, int]]:
     # spread ~ radius * 1.41 for a thin ring
     spread = float(np.std(xs) + np.std(ys))
 
-    # Too small -> noise/dot;  too large -> animated (shrinking) frame
-    if spread < 2 or spread > 25:
+    # Too small -> noise/dot;  too large -> animated (shrinking) frame.
+    # Upper limit raised slightly (25->35) to catch circles that are still
+    # shrinking when the scanner fires.
+    if spread < 2 or spread > 35:
         return None
 
     return int(cx), int(cy)
@@ -235,17 +237,34 @@ class GameMapOverlay(QWidget):
     # Player tracking
     # ------------------------------------------------------------------
 
+    def set_fast_scan(self, fast: bool):
+        """Switch between normal (600ms) and fast (120ms) scan interval."""
+        self._timer.setInterval(120 if fast else 600)
+
     def _update_arrow(self):
         self._debug_tick += 1
         if not _PIL_OK or self._map_w <= 0 or self._map_h <= 0:
             self._debug_last_error = f"skip: PIL={_PIL_OK} w={self._map_w} h={self._map_h}"
             return
         try:
-            img = ImageGrab.grab(
-                bbox=(self._map_x, self._map_y,
-                      self._map_x + self._map_w,
-                      self._map_y + self._map_h)
-            )
+            # Hide our own overlay before grabbing so our yellow pins don't
+            # appear in the screenshot and reduce the red circle pixel count.
+            was_visible = self.isVisible()
+            if was_visible:
+                self.hide()
+                QApplication.processEvents()
+
+            try:
+                img = ImageGrab.grab(
+                    bbox=(self._map_x, self._map_y,
+                          self._map_x + self._map_w,
+                          self._map_y + self._map_h)
+                )
+            finally:
+                if was_visible:
+                    self.show()
+                    _apply_click_through(self.winId())
+
             arr = np.array(img.convert("RGB"))
 
             result = find_player_arrow(arr)
@@ -270,8 +289,12 @@ class GameMapOverlay(QWidget):
                 if circle:
                     cx, cy = circle
                     now = time.time()
+                    # Dup check: same position AND seen recently (<15 s).
+                    # Time limit prevents old pins from blocking new surveys
+                    # that happen to land on or near the same map position.
                     is_dup = any(
                         abs(p[0] - cx) < 15 and abs(p[1] - cy) < 15
+                        and (now - p[2]) < 15.0
                         for p in self._circle_pins
                     )
                     if not is_dup:
