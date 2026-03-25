@@ -4311,6 +4311,19 @@ function renderSurveyTab() {
               ⏹ Stop Server
             </button>
           </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">Auto-use hotkey</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <select style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px;font-size:12px"
+                onchange="surveySend({type:'cmd_update_config',auto_use_hotkey_vk:+this.value})">
+                ${[['F1',0x70],['F2',0x71],['F3',0x72],['F4',0x73],['F5',0x74],['F6',0x75],
+                   ['F7',0x76],['F8',0x77],['F9',0x78],['F10',0x79],['F11',0x7A],['F12',0x7B]]
+                  .map(([name,vk])=>`<option value="${vk}" ${(surveyConfig.auto_use_hotkey_vk||0x75)===vk?'selected':''}>${name}</option>`)
+                  .join('')}
+              </select>
+              <span style="font-size:11px;color:var(--text-dim)">Press once to start, again to cancel</span>
+            </div>
+          </div>
           ${['inventory','map'].map(purpose => {
             const isInv = purpose === 'inventory';
             const cfg   = isInv ? (surveyConfig.inventory || {}) : (surveyConfig.map_capture || {});

@@ -41,6 +41,7 @@ class Config:
     overlay_mode: bool = False
     player_east: float = 0.0
     player_south: float = 0.0
+    auto_use_hotkey_vk: int = 0x75   # F6 by default
 
     def save(self):
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -77,4 +78,5 @@ class Config:
         cfg.overlay_mode = data.get("overlay_mode", False)
         cfg.player_east = data.get("player_east", 0.0)
         cfg.player_south = data.get("player_south", 0.0)
+        cfg.auto_use_hotkey_vk = data.get("auto_use_hotkey_vk", 0x75)
         return cfg

@@ -6,6 +6,7 @@ screen capture, mouse hooks, chat tailing) stays in Python; state and
 events stream to the browser over ws://localhost:8765.
 """
 import asyncio
+import time
 import http.server
 import json
 import logging
@@ -28,6 +29,7 @@ from ui_game_map_overlay import GameMapOverlay
 from ui_region_selector import RegionSelector
 from ui_region_highlighter import RegionHighlighter
 from inventory_click_watcher import InventoryClickWatcher
+from keyboard_hotkey import KeyboardHotkey
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [Survey] %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -189,6 +191,11 @@ class SurveyServer:
         # Clean shutdown signal — set by cmd_shutdown to exit run() normally
         self._shutdown_event = asyncio.Event()
 
+        # Auto-use hotkey state
+        self._auto_use_active: bool = False
+        self._auto_use_event: Optional[asyncio.Event] = None
+        self._hotkey: Optional[KeyboardHotkey] = None
+
         # Region selector overlay (keep reference so Qt doesn't GC it)
         self._region_selector: Optional[RegionSelector] = None
 
@@ -216,6 +223,14 @@ class SurveyServer:
         self.click_watcher.double_clicked_slot.connect(
             lambda slot: asyncio.ensure_future(self._on_inv_double_click(slot))
         )
+
+        # Global keyboard hotkey for auto-use
+        self._hotkey = KeyboardHotkey(
+            self.config.auto_use_hotkey_vk,
+            lambda: asyncio.ensure_future(self._on_hotkey_press()),
+        )
+        self._hotkey.start()
+        log.info("Auto-use hotkey registered (VK 0x%02X)", self.config.auto_use_hotkey_vk)
 
         log.info("Starting WebSocket server on ws://%s:%d", WS_HOST, WS_PORT)
         async with websockets.serve(self._handle_client, WS_HOST, WS_PORT):
@@ -289,6 +304,7 @@ class SurveyServer:
                 "inventory": asdict(self.config.inventory),
                 "map_capture": asdict(self.config.map_capture),
                 "chat_log_dir": self.config.chat_log_dir,
+                "auto_use_hotkey_vk": self.config.auto_use_hotkey_vk,
             },
             "locations": [_loc_to_dict(l) for l in locs],
             "route_id_order": self._route_id_order,
@@ -496,6 +512,9 @@ class SurveyServer:
         if loc:
             self._current_scan_slot += 1
             self.inv_overlay.set_current_slot(self._current_scan_slot)
+            # Wake up auto-use loop if it's waiting for this detection
+            if self._auto_use_event and not self._auto_use_event.is_set():
+                self._auto_use_event.set()
             await self.broadcast({
                 "type": "survey_detected",
                 "location": _loc_to_dict(loc),
@@ -503,6 +522,9 @@ class SurveyServer:
                 "status": f"Detected: {item_name}  ({east:+d}E, {south:+d}S)  [slot {self._current_scan_slot}]",
             })
         else:
+            # Also wake auto-use on duplicate so it doesn't timeout
+            if self._auto_use_event and not self._auto_use_event.is_set():
+                self._auto_use_event.set()
             await self.broadcast({
                 "type": "survey_duplicate",
                 "east": east, "south": south,
@@ -625,6 +647,81 @@ class SurveyServer:
         self.inv_overlay.set_slot_labels(labels, first_unvisited_slot)
         self.inv_overlay.repaint()
         self.click_watcher.set_active_slots(set(labels.keys()))
+
+    # ------------------------------------------------------------------
+    # Auto-use hotkey
+    # ------------------------------------------------------------------
+
+    async def _on_hotkey_press(self):
+        if not self._surveying:
+            return
+        if self._setup_complete:
+            return  # auto-use only makes sense in setup mode
+        if self._auto_use_active:
+            self._auto_use_active = False
+            log.info("AUTO-USE  cancelled by hotkey")
+            await self.broadcast({"type": "status", "message": "Auto-use cancelled"})
+        else:
+            asyncio.ensure_future(self._auto_use_surveys())
+
+    async def _auto_use_surveys(self):
+        """Simulate double-clicking each survey slot in sequence until timeout."""
+        if self._auto_use_active:
+            return
+        self._auto_use_active = True
+        count = 0
+        log.info("AUTO-USE  starting from slot %d", self._current_scan_slot)
+        await self.broadcast({"type": "status", "message": "Auto-use: starting…"})
+
+        DETECT_TIMEOUT = 7.0   # seconds to wait for survey_detected per survey
+        INTER_DELAY    = 0.8   # pause between surveys to let inventory settle
+
+        try:
+            while self._auto_use_active:
+                slot = self._current_scan_slot
+                x, y = self._slot_screen_center(slot)
+                log.debug("AUTO-USE  clicking slot %d at (%d, %d)", slot, x, y)
+
+                self._auto_use_event = asyncio.Event()
+                self._simulate_double_click(x, y)
+
+                try:
+                    await asyncio.wait_for(self._auto_use_event.wait(), timeout=DETECT_TIMEOUT)
+                except asyncio.TimeoutError:
+                    log.info("AUTO-USE  timeout — no survey detected at slot %d, stopping", slot)
+                    msg = f"Auto-use done — {count} survey{'s' if count != 1 else ''} used"
+                    await self.broadcast({"type": "status", "message": msg})
+                    break
+
+                count += 1
+                await asyncio.sleep(INTER_DELAY)
+        finally:
+            self._auto_use_active = False
+            self._auto_use_event = None
+
+    def _slot_screen_center(self, slot_index: int):
+        """Return (screen_x, screen_y) of the centre of an inventory slot."""
+        inv = self.config.inventory
+        col = slot_index % inv.grid_cols
+        row = slot_index // inv.grid_cols
+        x = (inv.screen_x + inv.padding_left
+             + col * (inv.slot_width + inv.slot_gap)
+             + inv.slot_width // 2)
+        y = (inv.screen_y + inv.padding_top
+             + row * (inv.slot_height + inv.slot_gap)
+             + inv.slot_height // 2)
+        return x, y
+
+    def _simulate_double_click(self, x: int, y: int):
+        """Move cursor and fire two left-click down/up pairs (= double-click)."""
+        MOUSEEVENTF_LEFTDOWN = 0x0002
+        MOUSEEVENTF_LEFTUP   = 0x0004
+        ctypes.windll.user32.SetCursorPos(x, y)
+        ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTUP,   0, 0, 0, 0)
+        time.sleep(0.05)   # within the system double-click window
+        ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTUP,   0, 0, 0, 0)
 
     # ------------------------------------------------------------------
     # Route calculation
@@ -821,5 +918,11 @@ class SurveyServer:
             self.config.player_east = float(msg["player_east"])
         if "player_south" in msg:
             self.config.player_south = float(msg["player_south"])
+        if "auto_use_hotkey_vk" in msg:
+            vk = int(msg["auto_use_hotkey_vk"])
+            self.config.auto_use_hotkey_vk = vk
+            if self._hotkey:
+                self._hotkey.update_vk(vk)
+            log.info("Auto-use hotkey changed to VK 0x%02X", vk)
         self.config.save()
         await self.broadcast({"type": "status", "message": "Settings saved"})
