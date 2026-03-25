@@ -4227,7 +4227,10 @@ function renderSurveyTab() {
   </button>
   <div style="color:var(--text-dim);font-size:11px;margin-bottom:20px">
     Launches <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">Survey/main.pyw</code> silently in the background.
-    To stop it, use the <strong style="color:var(--text)">⏹ Stop Server</strong> button in Survey → ⚙ Settings.<br><br>
+    It starts both the <strong style="color:var(--text)">WebSocket server</strong> (port 8765) and the
+    <strong style="color:var(--text)">HTTP file server</strong> (port 3000) — no need to run
+    <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">start_server.py</code> separately.
+    To stop everything, use the <strong style="color:var(--text)">⏹ Stop Server</strong> button in Survey → ⚙ Settings.<br><br>
     <strong style="color:var(--text)">First-time setup:</strong> run <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">py setup_survey.py</code> once.<br>
     This registers a <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">gorgon-survey://</code> custom URL protocol under
     <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">HKCU\Software\Classes\gorgon-survey</code> in the Windows registry,

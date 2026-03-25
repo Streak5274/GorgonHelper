@@ -6,9 +6,14 @@ screen capture, mouse hooks, chat tailing) stays in Python; state and
 events stream to the browser over ws://localhost:8765.
 """
 import asyncio
+import http.server
 import json
 import logging
+import subprocess
+import threading
+import urllib.request
 from dataclasses import asdict
+from pathlib import Path
 from typing import List, Optional, Set
 
 import websockets
@@ -29,6 +34,98 @@ log = logging.getLogger(__name__)
 
 WS_HOST = "localhost"
 WS_PORT = 8765
+HTTP_PORT = 3000
+_HTTP_ROOT = Path(__file__).parent.parent  # Reports root
+_VERSION_URL = "https://raw.githubusercontent.com/Streak5274/GorgonHelper/master/version.json"
+
+
+# ---------------------------------------------------------------------------
+# HTTP file server (serves the GorgonHelper app + API endpoints)
+# ---------------------------------------------------------------------------
+
+def _local_version() -> str:
+    try:
+        return json.loads((_HTTP_ROOT / "version.json").read_text())["version"]
+    except Exception:
+        return "unknown"
+
+
+def _check_update() -> dict:
+    local = _local_version()
+    try:
+        req = urllib.request.Request(_VERSION_URL, headers={"User-Agent": "GorgonHelper"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            remote = json.loads(r.read())["version"]
+        return {"local": local, "remote": remote, "upToDate": local == remote}
+    except Exception as exc:
+        return {"local": local, "remote": None, "upToDate": None, "error": str(exc)}
+
+
+def _do_update() -> dict:
+    try:
+        result = subprocess.run(
+            ["git", "pull", "origin", "master"],
+            cwd=str(_HTTP_ROOT), capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            return {"status": "ok", "output": result.stdout.strip()}
+        return {"status": "error", "output": result.stderr.strip() or result.stdout.strip()}
+    except FileNotFoundError:
+        return {"status": "error", "output": "git not found — re-download to update."}
+    except Exception as exc:
+        return {"status": "error", "output": str(exc)}
+
+
+class _GorgonHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(_HTTP_ROOT), **kwargs)
+
+    def _send_json(self, data: dict, status: int = 200):
+        body = json.dumps(data).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path == "/api/check-update":
+            self._send_json(_check_update())
+        else:
+            super().do_GET()
+
+    def do_POST(self):
+        if self.path == "/api/start-survey":
+            self._send_json({"status": "already_running"})
+        elif self.path == "/api/update":
+            try:
+                self._send_json(_do_update())
+            except Exception as exc:
+                self._send_json({"status": "error", "output": str(exc)}, 500)
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, fmt, *args):
+        if args and not any(str(args[0]).startswith(p) for p in ("/icons/", "/maps/")):
+            log.debug("HTTP %s", args[0])
+
+
+def _start_http_server() -> bool:
+    """Start the HTTP file server in a daemon thread. Returns False if port taken."""
+    try:
+        srv = http.server.ThreadingHTTPServer(("", HTTP_PORT), _GorgonHandler)
+        t = threading.Thread(target=srv.serve_forever, daemon=True, name="http-server")
+        t.start()
+        log.info("HTTP server started on http://localhost:%d", HTTP_PORT)
+        return True
+    except OSError as exc:
+        # errno 10048 = WSAEADDRINUSE on Windows; 98 = EADDRINUSE on Linux
+        if exc.errno in (98, 10048) or "address already in use" in str(exc).lower():
+            log.info("Port %d already in use — start_server.py is probably running", HTTP_PORT)
+        else:
+            log.warning("Could not start HTTP server: %s", exc)
+        return False
 
 
 def _loc_to_dict(loc: SurveyLocation) -> dict:
@@ -98,6 +195,9 @@ class SurveyServer:
 
     async def run(self):
         """Top-level coroutine started from main.pyw."""
+        # Start HTTP file server (serves root GorgonHelper app + API endpoints)
+        _start_http_server()
+
         # Connect click watcher signal — use lambda so asyncio.ensure_future
         # schedules the coroutine; @asyncSlot doesn't work with typed signals.
         self.click_watcher.double_clicked_slot.connect(

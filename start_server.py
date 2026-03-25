@@ -148,7 +148,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     os.chdir(Path(__file__).parent)
     print(f"GorgonHelper serving on http://localhost:{PORT}")
-    with http.server.HTTPServer(("", PORT), Handler) as httpd:
+    with http.server.ThreadingHTTPServer(("", PORT), Handler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
