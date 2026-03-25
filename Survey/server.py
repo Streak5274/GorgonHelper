@@ -194,7 +194,8 @@ class SurveyServer:
 
         # Auto-use hotkey state
         self._auto_use_active: bool = False
-        self._auto_use_event: Optional[asyncio.Event] = None
+        self._auto_use_event: Optional[asyncio.Event] = None   # wakes on survey_detected
+        self._auto_use_pin_event: Optional[asyncio.Event] = None  # wakes on circle_pin_added
         self._hotkey: Optional[KeyboardHotkey] = None
 
         # Region selector overlay (keep reference so Qt doesn't GC it)
@@ -674,8 +675,9 @@ class SurveyServer:
         log.info("AUTO-USE  starting from slot %d", self._current_scan_slot)
         await self.broadcast({"type": "status", "message": "Auto-use: starting…"})
 
-        DETECT_TIMEOUT = 7.0   # seconds to wait for survey_detected per survey
-        INTER_DELAY    = 0.8   # pause between surveys to let inventory settle
+        CHAT_TIMEOUT = 7.0   # seconds to wait for survey_detected (chat log)
+        PIN_TIMEOUT  = 8.0   # seconds to wait for circle_pin_added (map OCR)
+        INTER_DELAY  = 0.3   # brief pause after pin detected before next click
 
         try:
             while self._auto_use_active:
@@ -683,22 +685,32 @@ class SurveyServer:
                 x, y = self._slot_screen_center(slot)
                 log.debug("AUTO-USE  clicking slot %d at (%d, %d)", slot, x, y)
 
+                # Step 1: wait for chat log to confirm survey was used
                 self._auto_use_event = asyncio.Event()
                 self._simulate_double_click(x, y)
 
                 try:
-                    await asyncio.wait_for(self._auto_use_event.wait(), timeout=DETECT_TIMEOUT)
+                    await asyncio.wait_for(self._auto_use_event.wait(), timeout=CHAT_TIMEOUT)
                 except asyncio.TimeoutError:
-                    log.info("AUTO-USE  timeout — no survey detected at slot %d, stopping", slot)
+                    log.info("AUTO-USE  chat timeout at slot %d — no survey detected, stopping", slot)
                     msg = f"Auto-use done — {count} survey{'s' if count != 1 else ''} used"
                     await self.broadcast({"type": "status", "message": msg})
                     break
+
+                # Step 2: wait for map overlay OCR to detect the crosshair pin
+                self._auto_use_pin_event = asyncio.Event()
+                try:
+                    await asyncio.wait_for(self._auto_use_pin_event.wait(), timeout=PIN_TIMEOUT)
+                    log.debug("AUTO-USE  pin detected for slot %d", slot)
+                except asyncio.TimeoutError:
+                    log.warning("AUTO-USE  pin timeout at slot %d — map OCR didn't detect crosshair", slot)
 
                 count += 1
                 await asyncio.sleep(INTER_DELAY)
         finally:
             self._auto_use_active = False
             self._auto_use_event = None
+            self._auto_use_pin_event = None
 
     def _slot_screen_center(self, slot_index: int):
         """Return (screen_x, screen_y) of the centre of an inventory slot."""
@@ -850,6 +862,9 @@ class SurveyServer:
         }))
 
     def _on_circle_pin(self, cx: int, cy: int):
+        # Wake auto-use loop if it's waiting for the map to detect this pin
+        if self._auto_use_pin_event and not self._auto_use_pin_event.is_set():
+            self._auto_use_pin_event.set()
         asyncio.ensure_future(self.broadcast({
             "type": "circle_pin_added",
             "pixel_x": cx, "pixel_y": cy,
