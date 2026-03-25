@@ -17,6 +17,7 @@ from config import Config
 from chat_watcher import ChatWatcher
 from survey_store import SurveyStore, SurveyLocation
 from route_solver import nearest_neighbor_route
+from PyQt5.QtWidgets import QApplication
 from ui_inventory_overlay import InventoryOverlay
 from ui_game_map_overlay import GameMapOverlay
 from ui_region_selector import RegionSelector

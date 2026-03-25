@@ -410,6 +410,7 @@ let showConsolidateOnly = false;
 let showSurveyTab = false;
 let surveyWs = null;
 let surveyConnected = false;
+let surveyShuttingDown = false;
 let surveyLocations = [];
 let surveyRouteOrder = [];
 let surveySlotLabels = {};
@@ -4020,7 +4021,8 @@ function surveyConnect() {
       surveyConnected = false;
       surveyWs = null;
       if (mainTab === 'survey') renderSurveyTab();
-      if (showSurveyTab) setTimeout(surveyConnect, 3000);
+      if (showSurveyTab && !surveyShuttingDown) setTimeout(surveyConnect, 3000);
+      surveyShuttingDown = false;
     };
     surveyWs.onerror = () => {};
     surveyWs.onmessage = e => { try { surveyHandleMessage(JSON.parse(e.data)); } catch(_) {} };
@@ -4064,6 +4066,10 @@ function surveySend(obj) {
 
 function surveyHandleMessage(msg) {
   switch(msg.type) {
+    case 'shutdown_ack':
+      surveyShuttingDown = true;
+      if (surveyWs) surveyWs.close();
+      return;
     case 'state_full':
       surveyLocations = msg.locations || [];
       surveyRouteOrder = msg.route_id_order || [];
