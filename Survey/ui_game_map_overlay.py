@@ -247,23 +247,13 @@ class GameMapOverlay(QWidget):
             self._debug_last_error = f"skip: PIL={_PIL_OK} w={self._map_w} h={self._map_h}"
             return
         try:
-            # Hide our own overlay before grabbing so our yellow pins don't
-            # appear in the screenshot and reduce the red circle pixel count.
-            was_visible = self.isVisible()
-            if was_visible:
-                self.hide()
-                QApplication.processEvents()
-
-            try:
-                img = ImageGrab.grab(
-                    bbox=(self._map_x, self._map_y,
-                          self._map_x + self._map_w,
-                          self._map_y + self._map_h)
-                )
-            finally:
-                if was_visible:
-                    self.show()
-                    _apply_click_through(self.winId())
+            # Yellow pins (R=255 G=230 B=0) cannot trigger the red-circle mask
+            # (requires G < 100), so we don't need to hide the overlay.
+            img = ImageGrab.grab(
+                bbox=(self._map_x, self._map_y,
+                      self._map_x + self._map_w,
+                      self._map_y + self._map_h)
+            )
 
             arr = np.array(img.convert("RGB"))
 
@@ -348,8 +338,10 @@ class GameMapOverlay(QWidget):
 
     def _do_paint(self, painter: QPainter):
         if self._setup_active:
-            # --- SETUP MODE: draw crosshairs at detected red-circle positions ---
-            for cpx, cpy, _t in self._circle_pins:
+            # --- SETUP MODE: draw crosshair only at the LATEST detected pin ---
+            # Previous pins are hidden to avoid clutter during rapid auto-use.
+            if self._circle_pins:
+                cpx, cpy, _t = self._circle_pins[-1]
                 pt = QPointF(cpx, cpy)
                 painter.setPen(QPen(QColor(255, 230, 0, 200), 2))
                 painter.setBrush(Qt.NoBrush)
