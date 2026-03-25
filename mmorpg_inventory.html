@@ -4154,8 +4154,12 @@ function renderSurveyTab() {
     ▶ Start Survey Helper
   </button>
   <div style="color:var(--text-dim);font-size:11px;margin-bottom:20px">
-    Launches <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">Survey/main.pyw</code> silently in the background.<br>
-    First-time setup: run <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">py setup_survey.py</code> once to register the launcher.
+    Launches <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">Survey/main.pyw</code> silently in the background.<br><br>
+    <strong style="color:var(--text)">First-time setup:</strong> run <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">py setup_survey.py</code> once.<br>
+    This registers a <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">gorgon-survey://</code> custom URL protocol under
+    <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">HKCU\Software\Classes\gorgon-survey</code> in the Windows registry,
+    pointing to <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">pythonw.exe Survey\main.pyw</code>.
+    No admin rights required. To undo: <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">py setup_survey.py remove</code>
   </div>
   <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
     <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">Or start manually:</div>
