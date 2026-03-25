@@ -4029,31 +4029,33 @@ function surveyConnect() {
   }
 }
 
-async function surveyLaunch() {
+function surveyLaunch() {
   const btn = document.getElementById('surveyLaunchBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Starting…'; }
-  try {
-    const res = await fetch('/api/start-survey', { method: 'POST' });
-    const data = await res.json();
-    if (data.status === 'launched') {
-      showToast('Survey Helper starting…');
-      // Give it a moment to bind the port, then start connecting
-      setTimeout(surveyConnect, 1500);
-    } else if (data.status === 'already_running') {
-      showToast('Already running — reconnecting…');
-      surveyConnect();
-    } else if (data.status === 'not_found') {
-      showToast('Survey/main.pyw not found', 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '▶ Start Survey Helper'; }
-    } else {
-      showToast('Error: ' + (data.message || data.status), 'error');
+
+  // Fire the custom URL protocol registered by:  py Survey/setup_protocol.py
+  // Works from any browser (file:// or http://), no HTTP server needed.
+  const a = document.createElement('a');
+  a.href = 'gorgon-survey://launch';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  // Silent fallback: also hit start_server.py endpoint if it happens to be running.
+  fetch('/api/start-survey', { method: 'POST' }).catch(() => {});
+
+  // Poll for WebSocket connection — main.pyw takes ~1-2 s to bind port 8765.
+  showToast('Survey Helper starting…');
+  let attempts = 0;
+  const poll = setInterval(() => {
+    attempts++;
+    surveyConnect();
+    if (surveyConnected || attempts >= 10) {
+      clearInterval(poll);
       if (btn) { btn.disabled = false; btn.textContent = '▶ Start Survey Helper'; }
     }
-  } catch(e) {
-    // fetch failed — start_server.py not running, fall back to manual instructions
-    showToast('Could not reach server — start py start_server.py first', 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '▶ Start Survey Helper'; }
-  }
+  }, 1500);
 }
 
 function surveySend(obj) {
@@ -4147,7 +4149,7 @@ function renderSurveyTab() {
   </button>
   <div style="color:var(--text-dim);font-size:11px;margin-bottom:20px">
     Launches <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">Survey/main.pyw</code> silently in the background.<br>
-    Requires <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">py start_server.py</code> to be running instead of <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">py -m http.server</code>.
+    First-time setup: run <code style="background:var(--bg3);padding:1px 5px;border-radius:3px">py Survey/setup_protocol.py</code> once to register the launcher.
   </div>
   <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
     <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">Or start manually:</div>
