@@ -183,6 +183,11 @@ class SurveyServer:
         self._current_slot_labels: dict = {}
         self._pending_visit_loc: Optional[SurveyLocation] = None
         self._pending_timeout_handle = None
+        # After a pending times out we keep the loc here briefly so that late
+        # chat-log confirmations (arriving a few seconds after the timeout) can
+        # still mark the survey as visited.
+        self._grace_loc: Optional[SurveyLocation] = None
+        self._grace_time: float = 0.0   # time.monotonic() when grace started
         self._last_arrow_px: Optional[int] = None
         self._last_arrow_py: Optional[int] = None
 
@@ -228,19 +233,30 @@ class SurveyServer:
         )
 
         # Global keyboard hotkeys
-        self._hotkey = KeyboardHotkey(
-            self.config.auto_use_hotkey_vk,
-            lambda: asyncio.ensure_future(self._on_hotkey_press()),
-        )
-        self._hotkey.start()
-        log.info("Auto-use hotkey registered (VK 0x%02X)", self.config.auto_use_hotkey_vk)
+        # Auto-use is a debug/advanced feature — only register if explicitly enabled in config.json.
+        if self.config.debug_auto_use:
+            self._hotkey = KeyboardHotkey(
+                self.config.auto_use_hotkey_vk,
+                lambda: asyncio.ensure_future(self._on_hotkey_press()),
+                self.config.auto_use_hotkey_mods,
+                active_window_contains="Project Gorgon",
+            )
+            self._hotkey.start()
+            log.info("Auto-use hotkey registered (VK 0x%02X mods=0x%X)",
+                     self.config.auto_use_hotkey_vk, self.config.auto_use_hotkey_mods)
+        else:
+            self._hotkey = None
+            log.info("Auto-use hotkey disabled (debug_auto_use=false in config.json)")
 
         self._single_use_hotkey = KeyboardHotkey(
             self.config.single_use_hotkey_vk,
             lambda: asyncio.ensure_future(self._on_single_use_press()),
+            self.config.single_use_hotkey_mods,
+            active_window_contains="Project Gorgon",
         )
         self._single_use_hotkey.start()
-        log.info("Single-use hotkey registered (VK 0x%02X)", self.config.single_use_hotkey_vk)
+        log.info("Single-use hotkey registered (VK 0x%02X mods=0x%X)",
+                 self.config.single_use_hotkey_vk, self.config.single_use_hotkey_mods)
 
         log.info("Starting WebSocket server on ws://%s:%d", WS_HOST, WS_PORT)
         async with websockets.serve(self._handle_client, WS_HOST, WS_PORT):
@@ -314,8 +330,11 @@ class SurveyServer:
                 "inventory": asdict(self.config.inventory),
                 "map_capture": asdict(self.config.map_capture),
                 "chat_log_dir": self.config.chat_log_dir,
-                "auto_use_hotkey_vk": self.config.auto_use_hotkey_vk,
-                "single_use_hotkey_vk": self.config.single_use_hotkey_vk,
+                "debug_auto_use":         self.config.debug_auto_use,
+                "auto_use_hotkey_vk":     self.config.auto_use_hotkey_vk,
+                "auto_use_hotkey_mods":   self.config.auto_use_hotkey_mods,
+                "single_use_hotkey_vk":   self.config.single_use_hotkey_vk,
+                "single_use_hotkey_mods": self.config.single_use_hotkey_mods,
             },
             "locations": [_loc_to_dict(l) for l in locs],
             "route_id_order": self._route_id_order,
@@ -349,6 +368,12 @@ class SurveyServer:
                 loc = self.store.get_by_id(loc_id)
                 if loc:
                     await self._mark_location_visited(loc)
+        elif t == "cmd_unmark_visited":
+            loc_id = msg.get("location_id")
+            if loc_id is not None:
+                loc = self.store.get_by_id(loc_id)
+                if loc and loc.visited:
+                    await self._unmark_location_visited(loc)
         elif t == "cmd_clear_area":
             await self._clear_area()
         elif t == "cmd_clear_all":
@@ -466,6 +491,13 @@ class SurveyServer:
                 loc.pixel_y = float(pins[i][1])
         self.store.save()
 
+        # Always tell the frontend setup ended so the button flips even when
+        # there are 0 locations (route_calculated is never sent in that case).
+        await self.broadcast({
+            "type": "setup_stopped",
+            "locations": [_loc_to_dict(l) for l in all_locs],
+        })
+
         self.map_overlay.calibrate(all_locs)
         await self._calculate_route()
         self.map_overlay.update()
@@ -548,23 +580,48 @@ class SurveyServer:
         return name.lower().removeprefix("the ").removeprefix("a ").removeprefix("an ").strip()
 
     async def _on_survey_completed(self, item_name: str):
-        log.debug("COMPLETED item=%r  pending=%s",
-                  item_name,
-                  f"#{self._pending_visit_loc.id} {self._pending_visit_loc.item_name!r}"
-                  if self._pending_visit_loc else "none (will NOT mark)")
-        if not self._setup_complete or self._pending_visit_loc is None:
+        if not self._setup_complete:
             return
+
+        # Resolve which pending loc to use — active pending takes priority,
+        # then fall back to the grace-period loc (recently timed out).
         loc = self._pending_visit_loc
+        from_grace = False
+        if loc is None:
+            if (self._grace_loc is not None and
+                    time.monotonic() - self._grace_time < self._GRACE_PERIOD):
+                loc = self._grace_loc
+                from_grace = True
+                log.debug("COMPLETED item=%r  pending=none → using grace-period #%d %r",
+                          item_name, loc.id, loc.item_name)
+            else:
+                log.debug("COMPLETED item=%r  pending=none (will NOT mark)", item_name)
+                return
+        else:
+            log.debug("COMPLETED item=%r  pending=#%d %r",
+                      item_name, loc.id, loc.item_name)
+
         # Guard: only mark if the completed item matches the pending survey item.
         # Enemy loot also fires survey_completed ("You receive Hops") — reject those.
         if self._normalize_item_name(item_name) != self._normalize_item_name(loc.item_name):
-            log.debug("COMPLETED item=%r doesn't match pending %r — ignoring (enemy loot?)",
+            log.debug("COMPLETED item=%r doesn't match %r — ignoring (enemy loot?)",
                       item_name, loc.item_name)
             return
-        self._pending_visit_loc = None
-        if self._pending_timeout_handle:
-            self._pending_timeout_handle.cancel()
-            self._pending_timeout_handle = None
+
+        # Clear pending / grace state.
+        # When the *active* pending is marked we also wipe the grace ref so that
+        # any further COMPLETED events from the same multi-item survey batch
+        # (e.g. the game reports "You receive Slab A, You receive Slab B" all at
+        # once) don't accidentally match a previously timed-out grace survey.
+        if from_grace:
+            self._grace_loc = None
+        else:
+            self._pending_visit_loc = None
+            self._grace_loc = None          # ← prevent same-batch grace false-mark
+            if self._pending_timeout_handle:
+                self._pending_timeout_handle.cancel()
+                self._pending_timeout_handle = None
+
         await self._mark_location_visited(loc)
 
     async def _on_area_detected(self, area: str):
@@ -602,16 +659,24 @@ class SurveyServer:
                 })
                 return
 
+    _PENDING_TIMEOUT  = 20.0   # seconds before giving up on chat confirmation
+    _GRACE_PERIOD     = 8.0    # seconds after timeout where late COMPLETED can still match
+
     def _reset_pending_timeout(self):
         if self._pending_timeout_handle:
             self._pending_timeout_handle.cancel()
         loop = asyncio.get_event_loop()
-        self._pending_timeout_handle = loop.call_later(10.0, self._timeout_pending_visit)
+        self._pending_timeout_handle = loop.call_later(
+            self._PENDING_TIMEOUT, self._timeout_pending_visit)
 
     def _timeout_pending_visit(self):
         if self._pending_visit_loc is not None:
-            log.debug("TIMEOUT   pending #%d %r cleared after 10 s with no chat confirmation",
-                      self._pending_visit_loc.id, self._pending_visit_loc.item_name)
+            log.debug("TIMEOUT   pending #%d %r cleared after %.0f s with no chat confirmation",
+                      self._pending_visit_loc.id, self._pending_visit_loc.item_name,
+                      self._PENDING_TIMEOUT)
+            # Keep a grace-period reference so late COMPLETED events can still match
+            self._grace_loc  = self._pending_visit_loc
+            self._grace_time = time.monotonic()
             self._pending_visit_loc = None
             asyncio.ensure_future(self.broadcast({
                 "type": "status",
@@ -655,6 +720,36 @@ class SurveyServer:
             "status": f"Visited: {loc.item_name} — {remaining} remaining" if remaining else "All survey locations visited!",
         })
 
+    async def _unmark_location_visited(self, loc: SurveyLocation):
+        restored_slot = loc.inventory_slot
+        log.info("UNMARK    #%d %r  restoring slot=%s", loc.id, loc.item_name, restored_slot)
+        # Reverse the slot shift: every currently-unvisited item at slot >= restored_slot
+        # was shifted left when this item was consumed — shift them right again.
+        if restored_slot is not None:
+            for ul in self.store.get_unvisited(self.config.active_area):
+                if ul.inventory_slot is not None and ul.inventory_slot >= restored_slot:
+                    self.store.update_slot(ul.id, ul.inventory_slot + 1)
+        self.store.mark_unvisited(loc.id)
+        # inventory_slot on loc was preserved through mark_visited, so it's still correct.
+
+        self._rebuild_slot_labels()
+        all_locs = self.store.get_all(self.config.active_area)
+        self.map_overlay.update_survey_data(all_locs, self._route_mapped)
+
+        remaining = len(self.store.get_unvisited(self.config.active_area))
+        if remaining > 0:
+            self.inv_overlay.set_overlay_visible(True)
+
+        slot_labels_str = {str(k): v for k, v in self._current_slot_labels.items()}
+        await self.broadcast({
+            "type": "survey_unmarked",
+            "location_id": loc.id,
+            "locations": [_loc_to_dict(l) for l in all_locs],
+            "slot_labels": slot_labels_str,
+            "remaining": remaining,
+            "status": f"Unmarked: {loc.item_name} — {remaining} remaining",
+        })
+
     def _rebuild_slot_labels(self):
         labels = {}
         first_unvisited_slot = None
@@ -687,10 +782,34 @@ class SurveyServer:
             asyncio.ensure_future(self._auto_use_surveys())
 
     async def _on_single_use_press(self):
-        """Use the current highlighted survey slot once — only during active setup."""
-        if not self._surveying or self._setup_complete or self._auto_use_active:
+        """Use the current survey slot once.
+
+        Setup mode:  clicks _current_scan_slot (the next un-scanned slot).
+        Route mode:  clicks the inventory_slot of the first unvisited survey
+                     in route order.
+        """
+        # Active setup: _surveying=True, _setup_complete=False
+        # Route mode:   _surveying=False, _setup_complete=True
+        in_setup = self._surveying and not self._setup_complete
+        in_route = self._setup_complete and bool(self._route_id_order)
+        if (not in_setup and not in_route) or self._auto_use_active:
             return
-        slot = self._current_scan_slot
+
+        if not self._setup_complete:
+            # Setup mode
+            slot = self._current_scan_slot
+        else:
+            # Route mode — find the first unvisited survey's inventory slot
+            slot = None
+            for loc_id in self._route_id_order:
+                loc = self.store.get_by_id(loc_id)
+                if loc and not loc.visited and loc.inventory_slot is not None:
+                    slot = loc.inventory_slot
+                    break
+            if slot is None:
+                log.debug("SINGLE-USE  no unvisited surveys remaining")
+                return
+
         x, y = self._slot_screen_center(slot)
         log.debug("SINGLE-USE  clicking slot %d at (%d, %d)", slot, x, y)
         self._simulate_double_click(x, y)
@@ -715,10 +834,15 @@ class SurveyServer:
                 x, y = self._slot_screen_center(slot)
                 log.debug("AUTO-USE  clicking slot %d at (%d, %d)", slot, x, y)
 
-                # Step 1: wait for chat log to confirm survey was used
+                # Create pin event BEFORE the click — the red circle appears on map
+                # almost immediately after clicking (visual feedback), while the chat
+                # log entry takes 2-3 s.  Creating the event here ensures we don't miss
+                # the detection while waiting for the chat event.
                 self._auto_use_event = asyncio.Event()
+                self._auto_use_pin_event = asyncio.Event()
                 self._simulate_double_click(x, y)
 
+                # Step 1: wait for chat log to confirm survey was used
                 try:
                     await asyncio.wait_for(self._auto_use_event.wait(), timeout=CHAT_TIMEOUT)
                 except asyncio.TimeoutError:
@@ -727,13 +851,15 @@ class SurveyServer:
                     await self.broadcast({"type": "status", "message": msg})
                     break
 
-                # Step 2: wait for map overlay OCR to detect the crosshair pin
-                self._auto_use_pin_event = asyncio.Event()
-                try:
-                    await asyncio.wait_for(self._auto_use_pin_event.wait(), timeout=PIN_TIMEOUT)
-                    log.debug("AUTO-USE  pin detected for slot %d", slot)
-                except asyncio.TimeoutError:
-                    log.warning("AUTO-USE  pin timeout at slot %d — map OCR didn't detect crosshair", slot)
+                # Step 2: pin event may already be set (detected during chat wait)
+                if self._auto_use_pin_event.is_set():
+                    log.debug("AUTO-USE  pin already detected for slot %d", slot)
+                else:
+                    try:
+                        await asyncio.wait_for(self._auto_use_pin_event.wait(), timeout=PIN_TIMEOUT)
+                        log.debug("AUTO-USE  pin detected for slot %d", slot)
+                    except asyncio.TimeoutError:
+                        log.warning("AUTO-USE  pin timeout at slot %d — map OCR didn't detect crosshair", slot)
 
                 count += 1
                 await asyncio.sleep(INTER_DELAY)
@@ -757,15 +883,27 @@ class SurveyServer:
         return x, y
 
     def _simulate_double_click(self, x: int, y: int):
-        """Move cursor and fire two left-click down/up pairs (= double-click)."""
+        """Move cursor, fire two left-click pairs (double-click), then restore cursor."""
         MOUSEEVENTF_LEFTDOWN = 0x0002
         MOUSEEVENTF_LEFTUP   = 0x0004
+        # Save current cursor position so we can restore it afterwards
+        pt = ctypes.wintypes.POINT()
+        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+        prev_x, prev_y = pt.x, pt.y
+
         ctypes.windll.user32.SetCursorPos(x, y)
         ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
         ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTUP,   0, 0, 0, 0)
         time.sleep(0.05)   # within the system double-click window
         ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
         ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTUP,   0, 0, 0, 0)
+
+        # Wait briefly before restoring so the game engine has time to register the
+        # double-click at (x, y).  Moving the cursor immediately after the events are
+        # posted can cause the game to see the item as no longer hovered and discard
+        # the action before processing it.
+        time.sleep(0.15)
+        ctypes.windll.user32.SetCursorPos(prev_x, prev_y)
 
     # ------------------------------------------------------------------
     # Route calculation
@@ -978,12 +1116,26 @@ class SurveyServer:
             self.config.auto_use_hotkey_vk = vk
             if self._hotkey:
                 self._hotkey.update_vk(vk)
-            log.info("Auto-use hotkey changed to VK 0x%02X", vk)
+            log.info("Auto-use hotkey changed to VK 0x%02X mods=0x%X",
+                     vk, self.config.auto_use_hotkey_mods)
+        if "auto_use_hotkey_mods" in msg:
+            mods = int(msg["auto_use_hotkey_mods"])
+            self.config.auto_use_hotkey_mods = mods
+            if self._hotkey:
+                self._hotkey.update_modifiers(mods)
+            log.info("Auto-use hotkey mods changed to 0x%X", mods)
         if "single_use_hotkey_vk" in msg:
             vk = int(msg["single_use_hotkey_vk"])
             self.config.single_use_hotkey_vk = vk
             if self._single_use_hotkey:
                 self._single_use_hotkey.update_vk(vk)
-            log.info("Single-use hotkey changed to VK 0x%02X", vk)
+            log.info("Single-use hotkey changed to VK 0x%02X mods=0x%X",
+                     vk, self.config.single_use_hotkey_mods)
+        if "single_use_hotkey_mods" in msg:
+            mods = int(msg["single_use_hotkey_mods"])
+            self.config.single_use_hotkey_mods = mods
+            if self._single_use_hotkey:
+                self._single_use_hotkey.update_modifiers(mods)
+            log.info("Single-use hotkey mods changed to 0x%X", mods)
         self.config.save()
         await self.broadcast({"type": "status", "message": "Settings saved"})

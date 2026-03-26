@@ -280,10 +280,13 @@ class GameMapOverlay(QWidget):
                     cx, cy = circle
                     now = time.time()
                     # Dup check: same position AND seen recently (<15 s).
+                    # Threshold is 25 px (not strict <15) so that slight OCR
+                    # jitter between fast scans doesn't add phantom extra pins
+                    # that would shift the index-based pin→location assignment.
                     # Time limit prevents old pins from blocking new surveys
                     # that happen to land on or near the same map position.
                     is_dup = any(
-                        abs(p[0] - cx) < 15 and abs(p[1] - cy) < 15
+                        abs(p[0] - cx) <= 25 and abs(p[1] - cy) <= 25
                         and (now - p[2]) < 15.0
                         for p in self._circle_pins
                     )
