@@ -1072,9 +1072,14 @@ class SurveyServer:
         labels = {
             "inventory":    "Drag to select the first inventory slot — Esc to cancel",
             "map":          "Drag to select the game map region — Esc to cancel",
-            "safecracking": "Drag to select the 12-rune symbol grid — Esc to cancel",
+            "safecracking": "Select the 6×2 rune symbol grid ONLY (not the whole window) — Esc to cancel",
         }
-        selector = RegionSelector(labels.get(purpose, "Drag to select a region — Esc to cancel"))
+        grids = {
+            "safecracking": (6, 2),
+        }
+        cols, rows = grids.get(purpose, (0, 0))
+        selector = RegionSelector(labels.get(purpose, "Drag to select a region — Esc to cancel"),
+                                  grid_cols=cols, grid_rows=rows)
         self._region_selector = selector  # keep Qt reference alive
 
         selector.region_selected.connect(
