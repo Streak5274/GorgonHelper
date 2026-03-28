@@ -23,7 +23,8 @@ import websockets
 from config import Config
 from chat_watcher import ChatWatcher
 from survey_store import SurveyStore, SurveyLocation
-from safecracking import SafecrackingSolver, capture_symbols
+from safecracking import (SafecrackingSolver, capture_symbols,
+                           capture_current_slots, capture_guess_history)
 from route_solver import nearest_neighbor_route
 from PyQt5.QtWidgets import QApplication
 from ui_inventory_overlay import InventoryOverlay
@@ -424,6 +425,8 @@ class SurveyServer:
             await self._sc_record(guess, exact, misplaced)
         elif t == "sc_undo":
             await self._sc_undo()
+        elif t == "sc_scan_state":
+            await self._sc_scan_state()
         elif t == "cmd_ping":
             await self._send(ws, {"type": "pong"})
         elif t == "cmd_shutdown":
@@ -1072,11 +1075,9 @@ class SurveyServer:
         labels = {
             "inventory":    "Drag to select the first inventory slot — Esc to cancel",
             "map":          "Drag to select the game map region — Esc to cancel",
-            "safecracking": "Select the 6×2 rune symbol grid ONLY (not the whole window) — Esc to cancel",
+            "safecracking": "Drag to select the entire Minotaur Lock window — Esc to cancel",
         }
-        grids = {
-            "safecracking": (6, 2),
-        }
+        grids: dict = {}   # no grid overlay — whole window selected
         cols, rows = grids.get(purpose, (0, 0))
         selector = RegionSelector(labels.get(purpose, "Drag to select a region — Esc to cancel"),
                                   grid_cols=cols, grid_rows=rows)
@@ -1236,3 +1237,46 @@ class SurveyServer:
         if self._sc_solver and self._sc_solver.undo():
             log.info("SC undo  candidates=%d", self._sc_solver.candidates_count)
         await self._sc_broadcast()
+
+    async def _sc_scan_state(self):
+        """Capture the whole window, detect current slots + guess history, and broadcast."""
+        from safecracking import _identify_symbol  # import helper directly
+        import base64, io as _io
+        try:
+            from PIL import Image as _PILImage
+        except ImportError:
+            _PILImage = None
+
+        sc = self.config.safecracking_region
+        if sc.w <= 0 or sc.h <= 0:
+            await self.broadcast({"type": "error", "message": "Safecracking region not set"})
+            return
+        log.info("SC scan_state  region=(%d,%d,%d,%d)", sc.x, sc.y, sc.w, sc.h)
+
+        current_slots = capture_current_slots(sc.x, sc.y, sc.w, sc.h, self._sc_symbols)
+        history_rows  = capture_guess_history(sc.x, sc.y, sc.w, sc.h)
+
+        # Identify history symbols against known thumbnails
+        processed: list = []
+        for row in history_rows:
+            if row["filled"] and _PILImage and self._sc_symbols:
+                indices: list = []
+                for b64 in row.get("symbol_b64s", []):
+                    try:
+                        data = base64.b64decode(b64)
+                        cell = _PILImage.open(_io.BytesIO(data)).convert("RGB")
+                        idx = _identify_symbol(cell, self._sc_symbols)
+                    except Exception:
+                        idx = 0
+                    indices.append(idx)
+                row = dict(row, symbol_indices=indices)
+            else:
+                row = dict(row, symbol_indices=[])
+            processed.append(row)
+
+        log.info("SC scan  slots=%s  history_rows=%d", current_slots, len(processed))
+        await self.broadcast({
+            "type": "sc_scan",
+            "current_slots": current_slots,
+            "history_scan": processed,
+        })
