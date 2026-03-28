@@ -4860,7 +4860,7 @@ function renderSafecrackingTab() {
   } else if (impossible) {
     bannerHtml = `<div style="color:#e07070;font-size:14px;font-weight:600">⚠ No consistent solution — check for input errors. Use Undo to correct.</div>`;
   } else if (solved) {
-    const sol = solver.candidates_count === 1 ? solver.suggestion : null;
+    const sol = solver.candidates === 1 ? solver.suggestion : null;
     const solHtml = sol ? sol.map(v => `<span style="display:inline-block;border:2px solid var(--gold);border-radius:6px;padding:2px 4px;margin:0 2px"><img src="data:image/png;base64,${symbols[v-1]}" style="width:36px;height:36px;vertical-align:middle;border-radius:4px"> <span style="font-size:12px;color:var(--text-dim)">${v}</span></span>`).join('') : '';
     bannerHtml = `<div style="color:#7ab880;font-size:14px;font-weight:600;margin-bottom:6px">✓ Solution found! Enter this combination:</div>${solHtml}`;
   } else if (suggestion) {
