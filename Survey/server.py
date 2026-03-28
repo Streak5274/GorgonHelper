@@ -23,17 +23,13 @@ import websockets
 from config import Config
 from chat_watcher import ChatWatcher
 from survey_store import SurveyStore, SurveyLocation
-from safecracking import (SafecrackingSolver, capture_symbols,
-                           capture_current_slots, capture_guess_history,
-                           capture_and_calibrate, load_digit_templates,
-                           calibrated_digit_count)
+from safecracking import SafecrackingSolver, capture_symbols
 from route_solver import nearest_neighbor_route
 from PyQt5.QtWidgets import QApplication
 from ui_inventory_overlay import InventoryOverlay
 from ui_game_map_overlay import GameMapOverlay
 from ui_region_selector import RegionSelector
 from ui_region_highlighter import RegionHighlighter
-from ui_safecracking_overlay import SafecrackingOverlay
 from inventory_click_watcher import InventoryClickWatcher
 from keyboard_hotkey import KeyboardHotkey
 
@@ -215,14 +211,9 @@ class SurveyServer:
         # ── Safecracking state ──────────────────────────────────────────
         self._sc_symbols: List[str] = []          # base64 thumbnails (up to 12)
         self._sc_solver: Optional[SafecrackingSolver] = None
-        self._sc_auto_running: bool = False
-        self._sc_auto_task: Optional[asyncio.Task] = None
-        self._sc_prev_slots: List[int] = [0, 0, 0, 0]
-        load_digit_templates()   # restore any previously learned digit templates
 
         # Region highlighter — transparent border shown while editing coords
         self._highlighter = RegionHighlighter()
-        self._sc_overlay = SafecrackingOverlay()
 
         # Apply saved map region if configured
         if self.config.map_capture.w > 0:
@@ -433,18 +424,6 @@ class SurveyServer:
             await self._sc_record(guess, exact, misplaced)
         elif t == "sc_undo":
             await self._sc_undo()
-        elif t == "sc_scan_state":
-            await self._sc_scan_state()
-        elif t == "sc_start_auto":
-            await self._sc_start_auto()
-        elif t == "sc_stop_auto":
-            await self._sc_stop_auto()
-        elif t == "sc_show_overlay":
-            self._sc_show_overlay()
-        elif t == "sc_hide_overlay":
-            self._sc_overlay.hide_overlay()
-        elif t == "sc_overlay_next":
-            self._sc_overlay.advance()
         elif t == "cmd_ping":
             await self._send(ws, {"type": "pong"})
         elif t == "cmd_shutdown":
@@ -1093,9 +1072,11 @@ class SurveyServer:
         labels = {
             "inventory":    "Drag to select the first inventory slot — Esc to cancel",
             "map":          "Drag to select the game map region — Esc to cancel",
-            "safecracking": "Drag to select the entire Minotaur Lock window — Esc to cancel",
+            "safecracking": "Select the 6×2 rune symbol grid ONLY (not the whole window) — Esc to cancel",
         }
-        grids: dict = {}   # no grid overlay — whole window selected
+        grids = {
+            "safecracking": (6, 2),
+        }
         cols, rows = grids.get(purpose, (0, 0))
         selector = RegionSelector(labels.get(purpose, "Drag to select a region — Esc to cancel"),
                                   grid_cols=cols, grid_rows=rows)
@@ -1208,7 +1189,6 @@ class SurveyServer:
             "region": {"x": sc.x, "y": sc.y, "w": sc.w, "h": sc.h},
             "symbols": self._sc_symbols,
             "solver": solver_state,
-            "calibrated_digits": calibrated_digit_count(),
         }
 
     async def _sc_broadcast(self):
@@ -1243,227 +1223,16 @@ class SurveyServer:
         await self._sc_broadcast()
 
     async def _sc_record(self, guess: List[int], exact: int, misplaced: int):
-        """Record a guess result, trigger digit calibration, and update solver state."""
+        """Record a guess result and update solver state."""
         if self._sc_solver is None:
             self._sc_solver = SafecrackingSolver(list(range(1, 13)))
-        # Calibrate digit templates using this guess's feedback (0-based index = current count)
-        guess_index = self._sc_solver.guess_count
         self._sc_solver.record(guess, exact, misplaced)
         log.info("SC record  guess=%s exact=%d misplaced=%d  candidates=%d",
                  guess, exact, misplaced, self._sc_solver.candidates_count)
-        sc = self.config.safecracking_region
-        if sc.w > 0 and sc.h > 0:
-            ok = capture_and_calibrate(sc.x, sc.y, sc.w, sc.h, guess_index, exact, misplaced)
-            log.info("SC calibrate guess=%d ok=%s  digits_known=%d",
-                     guess_index, ok, calibrated_digit_count())
         await self._sc_broadcast()
-
-    def _sc_symbol_screen_pos(self, symbol_index_1based: int):
-        """Return screen (x, y) centre for symbol N in the game window."""
-        from safecracking import SC_SYMBOL_GRID, SC_GUESS_COLS
-        sc = self.config.safecracking_region
-        if sc.w <= 0 or sc.h <= 0:
-            return None
-        idx = symbol_index_1based - 1
-        grid_col = idx % 6
-        grid_row = idx // 6
-        gl, gt, gw, gh = SC_SYMBOL_GRID
-        cell_w = (gw * sc.w) / 6
-        cell_h = (gh * sc.h) / 2
-        cx = sc.x + gl * sc.w + (grid_col + 0.5) * cell_w
-        cy = sc.y + gt * sc.h + (grid_row + 0.5) * cell_h
-        return int(cx), int(cy)
-
-    def _sc_show_overlay(self) -> None:
-        """Compute symbol screen positions for the current suggestion and show overlay."""
-        if self._sc_solver is None:
-            return
-        suggestion = self._sc_solver.suggest()
-        if not suggestion:
-            return
-        positions = []
-        for sym_idx in suggestion:
-            pos = self._sc_symbol_screen_pos(sym_idx)
-            if pos:
-                positions.append(pos)
-        if positions:
-            self._sc_overlay.show_suggestion(positions, suggestion)
 
     async def _sc_undo(self):
         """Undo the last recorded guess."""
         if self._sc_solver and self._sc_solver.undo():
             log.info("SC undo  candidates=%d", self._sc_solver.candidates_count)
         await self._sc_broadcast()
-
-    async def _sc_scan_state(self):
-        """Capture the whole window, detect current slots + guess history, and broadcast."""
-        from safecracking import _identify_symbol  # import helper directly
-        import base64, io as _io
-        try:
-            from PIL import Image as _PILImage
-        except ImportError:
-            _PILImage = None
-
-        sc = self.config.safecracking_region
-        if sc.w <= 0 or sc.h <= 0:
-            await self.broadcast({"type": "error", "message": "Safecracking region not set"})
-            return
-        log.info("SC scan_state  region=(%d,%d,%d,%d)", sc.x, sc.y, sc.w, sc.h)
-
-        current_slots = capture_current_slots(sc.x, sc.y, sc.w, sc.h, self._sc_symbols)
-        history_rows  = capture_guess_history(sc.x, sc.y, sc.w, sc.h)
-
-        # Identify history symbols against known thumbnails
-        processed: list = []
-        for row in history_rows:
-            if row["filled"] and _PILImage and self._sc_symbols:
-                indices: list = []
-                for b64 in row.get("symbol_b64s", []):
-                    try:
-                        data = base64.b64decode(b64)
-                        cell = _PILImage.open(_io.BytesIO(data)).convert("RGB")
-                        idx = _identify_symbol(cell, self._sc_symbols)
-                    except Exception:
-                        idx = 0
-                    indices.append(idx)
-                row = dict(row, symbol_indices=indices)
-            else:
-                row = dict(row, symbol_indices=[])
-            processed.append(row)
-
-        log.info("SC scan  slots=%s  history_rows=%d", current_slots, len(processed))
-        await self.broadcast({
-            "type": "sc_scan",
-            "current_slots": current_slots,
-            "history_scan": processed,
-        })
-
-    # ------------------------------------------------------------------
-    # Safecracking auto-mode pipeline
-    # ------------------------------------------------------------------
-
-    async def _sc_start_auto(self) -> None:
-        """Start the automatic monitoring loop."""
-        sc = self.config.safecracking_region
-        if sc.w <= 0 or sc.h <= 0:
-            await self.broadcast({"type": "error", "message": "Select the game window region first"})
-            return
-        # Capture symbols if not already captured
-        if not self._sc_symbols:
-            await self._sc_capture()
-        # Reset prev slots
-        self._sc_prev_slots = [0, 0, 0, 0]
-        self._sc_auto_running = True
-        # Show overlay for current suggestion
-        self._sc_show_overlay()
-        # Start monitoring loop
-        if self._sc_auto_task and not self._sc_auto_task.done():
-            self._sc_auto_task.cancel()
-        self._sc_auto_task = asyncio.ensure_future(self._sc_monitor_loop())
-        await self.broadcast({"type": "sc_auto_state", "running": True})
-        log.info("SC auto started")
-
-    async def _sc_stop_auto(self) -> None:
-        """Stop the automatic monitoring loop."""
-        self._sc_auto_running = False
-        if self._sc_auto_task and not self._sc_auto_task.done():
-            self._sc_auto_task.cancel()
-            self._sc_auto_task = None
-        self._sc_overlay.hide_overlay()
-        await self.broadcast({"type": "sc_auto_state", "running": False})
-        log.info("SC auto stopped")
-
-    async def _sc_monitor_loop(self) -> None:
-        """Periodically capture the game window to detect slot fills and guess submissions."""
-        from safecracking import match_feedback, capture_guess_history as _cgh
-        log.info("SC monitor loop started")
-        while self._sc_auto_running:
-            await asyncio.sleep(0.8)
-            try:
-                sc = self.config.safecracking_region
-                if sc.w <= 0 or sc.h <= 0:
-                    continue
-                curr_slots = capture_current_slots(sc.x, sc.y, sc.w, sc.h, self._sc_symbols)
-                prev = self._sc_prev_slots
-
-                prev_filled = sum(1 for s in prev if s > 0)
-                curr_filled = sum(1 for s in curr if s > 0)
-
-                if curr_filled > prev_filled:
-                    # New symbol placed — advance overlay to next slot
-                    log.info("SC auto: slot filled (%d->%d)", prev_filled, curr_filled)
-                    self._sc_overlay.advance()
-
-                elif prev_filled == 4 and curr_filled == 0:
-                    # All slots cleared — guess was just submitted
-                    log.info("SC auto: guess submitted, reading feedback")
-                    await asyncio.sleep(0.7)   # wait for game to update history
-                    await self._sc_auto_read_feedback(list(prev))
-
-                self._sc_prev_slots = curr_slots
-
-            except asyncio.CancelledError:
-                break
-            except Exception as exc:
-                log.warning("SC monitor error: %s", exc)
-
-        log.info("SC monitor loop ended")
-
-    async def _sc_auto_read_feedback(self, prev_slots: List[int]) -> None:
-        """OCR the latest guess row feedback and auto-record in the solver."""
-        from safecracking import capture_guess_history as _cgh
-        sc = self.config.safecracking_region
-        if self._sc_solver is None:
-            return
-
-        guess_index = self._sc_solver.guess_count   # 0-based row we just played
-
-        try:
-            history_rows = _cgh(sc.x, sc.y, sc.w, sc.h)
-        except Exception as exc:
-            log.warning("SC auto feedback capture failed: %s", exc)
-            return
-
-        # Map guess_index to grid position (3 cols × 4 rows)
-        grid_col = guess_index % 3
-        grid_row = guess_index // 3
-        flat_idx = grid_row * 3 + grid_col
-
-        if flat_idx >= len(history_rows):
-            log.warning("SC auto: history row %d not found (only %d rows)", flat_idx, len(history_rows))
-            return
-
-        row = history_rows[flat_idx]
-        if not row.get("filled"):
-            log.warning("SC auto: expected row %d to be filled", flat_idx)
-            return
-
-        feedback = row.get("feedback")
-        if feedback is None:
-            log.info("SC auto: feedback not recognised for row %d — awaiting manual input", flat_idx)
-            await self.broadcast({"type": "error",
-                "message": f"Could not read feedback for guess #{guess_index+1} — please enter it manually"})
-            return
-
-        exact, misplaced = int(feedback[0]), int(feedback[1])
-        log.info("SC auto: feedback row=%d exact=%d misplaced=%d", flat_idx, exact, misplaced)
-
-        # Use prev_slots as the guess (what was in the slots before they cleared)
-        guess = [s for s in prev_slots if s > 0]
-        if len(guess) != 4:
-            log.warning("SC auto: prev_slots incomplete: %s", prev_slots)
-            return
-
-        self._sc_solver.record(guess, exact, misplaced)
-        await self._sc_broadcast()
-
-        if self._sc_solver.solved:
-            log.info("SC auto: SOLVED!")
-            self._sc_overlay.hide_overlay()
-            await self.broadcast({"type": "sc_auto_state", "running": True})
-        elif self._sc_solver.impossible:
-            log.warning("SC auto: no solution — stopping")
-            await self._sc_stop_auto()
-        else:
-            # Show overlay for next suggestion
-            self._sc_show_overlay()
