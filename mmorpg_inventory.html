@@ -226,6 +226,31 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg);color:var(--te
 .ctx-btn.danger{background:rgba(192,80,80,.1);border-color:rgba(192,80,80,.35);color:#e07070}
 
 /* ── Favors tab ── */
+.favor-calc-panel{max-width:560px;margin:28px auto}
+.favor-calc-title{font-family:'Cinzel',serif;font-size:13px;letter-spacing:.12em;color:var(--gold-dim);text-transform:uppercase;margin-bottom:22px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.favor-calc-row{display:flex;align-items:center;margin-bottom:11px;gap:10px}
+.favor-calc-label{width:120px;font-size:12px;color:var(--text-dim);text-align:right;flex-shrink:0}
+.favor-calc-dd-wrap{position:relative;flex:1}
+.favor-calc-dd-input{width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:5px 26px 5px 8px;font-size:13px;cursor:pointer;outline:none}
+.favor-calc-dd-input:focus{border-color:var(--gold-dim)}
+.favor-calc-dd-arrow{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--text-dim);pointer-events:none}
+.favor-calc-dd-list{position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:300;background:var(--bg2);border:1px solid var(--border);border-radius:5px;max-height:260px;overflow-y:auto;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+.favor-calc-dd-area-hdr{font-size:10px;color:var(--gold-dim);padding:5px 10px 3px;letter-spacing:.1em;text-transform:uppercase;border-top:1px solid rgba(255,255,255,.05);background:var(--bg3);position:sticky;top:0}
+.favor-calc-dd-area-hdr:first-child{border-top:none}
+.favor-calc-dd-item{padding:5px 10px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.favor-calc-dd-item:hover{background:rgba(255,255,255,.06)}
+.favor-calc-dd-item.selected{color:var(--gold)}
+.favor-calc-dd-item.has-data{font-weight:600}
+.favor-calc-num-input{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:5px 8px;font-size:13px;width:120px;outline:none}
+.favor-calc-num-input:focus{border-color:var(--gold-dim)}
+.favor-calc-tier-info{font-size:12px;color:var(--text-dim);margin-left:130px;margin-bottom:14px;margin-top:-4px}
+.favor-calc-prefs{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.favor-calc-divider{border:none;border-top:1px solid var(--border);margin:18px 0}
+.favor-calc-result{padding:16px 20px;background:rgba(192,80,80,.07);border:1px solid rgba(192,80,80,.22);border-radius:6px;font-size:13px}
+.favor-calc-result.done{background:rgba(80,192,80,.07);border-color:rgba(80,192,80,.22)}
+.favor-calc-result.empty{background:var(--bg2);border-color:var(--border);color:var(--text-dim)}
+.favor-calc-result-num{color:var(--gold);font-size:26px;font-weight:bold;display:block;margin-bottom:4px}
+.favor-calc-result-detail{color:var(--text-dim);font-size:12px;margin-top:6px}
 .favor-table{width:100%;border-collapse:collapse}
 .favor-table thead tr{border-bottom:1px solid var(--border)}
 .favor-table th{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.12em;color:var(--gold-dim);text-transform:uppercase;padding:5px 10px;text-align:left;white-space:nowrap;user-select:none}
@@ -425,7 +450,7 @@ let surveyCirclePins = [];
 // Game data (loaded from files)
 const APP_VERSION = '0.1.5';
 
-let ITEMS = {};           // id -> [name, maxStack]
+let ITEMS = {};           // id -> [name, maxStack, iconId, value, keywords[]]
 let RECIPES = {};         // internalName -> [name, skill, [[ingId,qty]...], [[resId,qty]...]]
 let ITEMUSES = {};        // id -> [recipeInternalName, ...]
 let SOURCES_RECIPES = {}; // internalName -> [{t, npc?, npcName?, area?, skill?, item?}]
@@ -1149,7 +1174,7 @@ function setMainTab(tab) {
 
 function renderAll() {
   // Always ensure activeCharId points to a valid character (or a known special value)
-  const specialIds = new Set(['__all__', '__availwo__']);
+  const specialIds = new Set(['__all__', '__availwo__', '__favorcalc__']);
   const validChar = characters.find(c => c.id === activeCharId);
   if (!validChar && !specialIds.has(activeCharId) && characters.length > 0) {
     activeCharId = characters[0].id;
@@ -1185,6 +1210,7 @@ function renderCharTabs() {
     </div>`).join('')
     + ((isWO || isVault || isFavor || isQuest) && characters.length > 1 ? `<div class="char-tab all-tab ${activeCharId==='__all__'?'active':''}" onclick="setActiveChar('__all__')">All Characters</div>` : '')
     + (isWO ? `<div class="char-tab ${activeCharId==='__availwo__'?'active':''}" onclick="setActiveChar('__availwo__')" title="Work Order scrolls in storage">📜 Available</div>` : '')
+    + (isFavor ? `<div class="char-tab ${activeCharId==='__favorcalc__'?'active':''}" onclick="setActiveChar('__favorcalc__')" title="Favor Calculator"><span style="color:var(--gold);font-size:16px;line-height:1">Σ</span> Calculator</div>` : '')
     + `<div class="char-tab add-tab" onclick="pickFolder()" title="Watch folder">＋</div>`;
 }
 
@@ -2205,6 +2231,7 @@ function buildFavorTrainingPanel(npcKey, chars) {
 }
 
 function renderFavorsTab() {
+  if (activeCharId === '__favorcalc__') return renderFavorCalcTab();
   const showAll = activeCharId === '__all__';
   const chars = showAll ? characters : characters.filter(c => c.id === activeCharId);
   if (chars.length === 0) {
@@ -2433,6 +2460,17 @@ let vaultAreaFilter = '';
 let favorAreaFilter = '';
 let favorSearchQ = '';
 let completedWOSearch = '';
+// Favor Calculator state
+let favorCalcCharId       = '';
+let favorCalcNpcKey       = '';
+let favorCalcItemId       = '';
+let favorCalcItemFavor    = '';
+let favorCalcCurrentFavor = '';
+let favorCalcNpcSearch    = '';
+let favorCalcItemSearch   = '';
+let favorCalcNpcOpen      = false;
+let favorCalcItemOpen     = false;
+let _favorCalcClickListenerAdded = false;
 
 // Maps tab state
 let currentMapArea = 'AreaSerbule';
@@ -3043,6 +3081,444 @@ function getVaultArea(vaultKey, vaultData) {
   // Fall back to vault's area field, strip the "Area" prefix
   const raw = vaultData.area || '';
   return raw.replace(/^Area/, '').replace(/([A-Z])/g, ' $1').trim() || 'Unknown';
+}
+
+// ─── Favor tier data ─────────────────────────────────────────────────────────
+// Points needed within a tier to advance to the NEXT tier.
+// Tiers listed worst→best; SoulMates is the cap (null = no further tier).
+const FAVOR_TIER_ORDER = [
+  'Despised', 'Hatred', 'Disliked', 'Tolerated',
+  'Neutral', 'Comfortable', 'Friends', 'CloseFriends',
+  'BestFriends', 'LikeFamily', 'SoulMates',
+];
+const FAVOR_TIER_CAPS = {
+  Despised:    1800,   // → Hated
+  Hatred:       300,   // → Disliked
+  Disliked:     200,   // → Tolerated
+  Tolerated:    100,   // → Neutral
+  Neutral:      100,   // → Comfortable
+  Comfortable:  200,   // → Friends
+  Friends:      300,   // → Close Friends
+  CloseFriends: 600,   // → Best Friends
+  BestFriends:  800,   // → Like Family
+  LikeFamily:  1000,   // → Soul Mates
+  SoulMates:   null,   // cap — no further tier
+};
+
+/**
+ * Total favor still needed from (tierKey, currentInTier) to reach Soul Mates.
+ * Returns null if the tier is unknown.
+ */
+function _fcFavorToSoulMates(tierKey, currentInTier) {
+  if (tierKey === 'SoulMates') return 0;
+  const idx = FAVOR_TIER_ORDER.indexOf(tierKey);
+  if (idx < 0) return null;
+  const cap = FAVOR_TIER_CAPS[tierKey];
+  if (cap == null) return null;
+  let total = Math.max(0, cap - currentInTier);
+  for (let i = idx + 1; i < FAVOR_TIER_ORDER.length - 1; i++) {
+    total += FAVOR_TIER_CAPS[FAVOR_TIER_ORDER[i]] ?? 0;
+  }
+  return total;
+}
+
+/**
+ * Build a multi-tier breakdown string for display.
+ */
+function _fcTierBreakdown(tierKey, currentInTier) {
+  const idx = FAVOR_TIER_ORDER.indexOf(tierKey);
+  if (idx < 0) return '';
+  const parts = [];
+  const startRemaining = Math.max(0, FAVOR_TIER_CAPS[tierKey] - currentInTier);
+  if (startRemaining > 0)
+    parts.push(`${FAVOR_LABELS[tierKey]||tierKey}: ${startRemaining}`);
+  for (let i = idx + 1; i < FAVOR_TIER_ORDER.length - 1; i++) {
+    const t = FAVOR_TIER_ORDER[i];
+    parts.push(`${FAVOR_LABELS[t]||t}: ${FAVOR_TIER_CAPS[t]}`);
+  }
+  return parts.join(' + ');
+}
+
+// ─── Favor Calculator ─────────────────────────────────────────────────────────
+function renderFavorCalcTab() {
+  // Auto-select first character if none chosen or no longer valid
+  if (!favorCalcCharId || !characters.find(c => c.id === favorCalcCharId)) {
+    favorCalcCharId = characters[0]?.id || '';
+  }
+  const selChar = characters.find(c => c.id === favorCalcCharId);
+
+  // Resolve current tier from char data
+  let currentTierKey = null;
+  if (selChar && favorCalcNpcKey) {
+    currentTierKey = selChar.charData?.NPCs?.[favorCalcNpcKey]?.FavorLevel || null;
+  }
+  const tierLabel = currentTierKey ? (FAVOR_LABELS[currentTierKey] || currentTierKey) : null;
+  const tierKnown = currentTierKey ? FAVOR_TIER_ORDER.includes(currentTierKey) : false;
+
+  // Resolved item
+  const selItem = favorCalcItemId ? ITEMS[favorCalcItemId] : null;
+  const selItemName = selItem ? selItem[0] : '';
+  const selItemIcon = favorCalcItemId ? getItemIconUrl(favorCalcItemId) : null;
+
+  // NPC name for display
+  const selNpc = favorCalcNpcKey ? NPCS[favorCalcNpcKey] : null;
+  const selNpcName = selNpc ? selNpc.name : '';
+
+  // ── Character <select> ──────────────────────────────────────────────────────
+  const charOpts = characters.map(c => {
+    const name = c.charData?.Character || c.id;
+    const server = c.charData?.ServerName ? ` (${c.charData.ServerName})` : '';
+    return `<option value="${c.id}" ${c.id === favorCalcCharId ? 'selected' : ''}>${name}${server}</option>`;
+  }).join('');
+
+  // ── NPC dropdown list ───────────────────────────────────────────────────────
+  const npcDropdown = favorCalcNpcOpen
+    ? `<div class="favor-calc-dd-list" id="fcNpcList">${_fcBuildNpcListHtml()}</div>`
+    : '';
+
+  // ── Item dropdown list ──────────────────────────────────────────────────────
+  const itemDropdown = favorCalcItemOpen
+    ? `<div class="favor-calc-dd-list" id="fcItemList">${_fcBuildItemListHtml()}</div>`
+    : '';
+
+  // ── Tier info ───────────────────────────────────────────────────────────────
+  let tierInfoHtml = '';
+  if (tierLabel) {
+    const capForTier = FAVOR_TIER_CAPS[currentTierKey];
+    const tierCapTxt = tierKnown
+      ? (currentTierKey === 'SoulMates'
+          ? 'already at max'
+          : `${capForTier} pts to next tier`)
+      : 'tier not in favor table';
+    // Inline gift preferences
+    const npcPrefs = NPCS[favorCalcNpcKey]?.prefs || [];
+    const prefOrder = ['Love','Like','Dislike','Hate'];
+    const sortedPrefs = [...npcPrefs].sort((a,b) => {
+      const ai = prefOrder.indexOf(a.desire), bi = prefOrder.indexOf(b.desire);
+      if (ai !== bi) return ai - bi;
+      return b.pref - a.pref;
+    });
+    const prefRowsHtml = sortedPrefs.map(p => {
+      const dc = DESIRE_COLORS[p.desire] || { dot:'var(--text-dim)', text:'var(--text-dim)' };
+      const sign = p.pref > 0 ? '+' : '';
+      return `<div class="npc-pref-row">
+        <div class="npc-pref-dot" style="background:${dc.dot}"></div>
+        <span class="npc-pref-name">${p.name}</span>
+        <span class="npc-pref-score" style="color:${dc.text}">${sign}${p.pref}</span>
+      </div>`;
+    }).join('');
+    tierInfoHtml = `<div class="favor-calc-tier-info">
+      Current tier: <strong style="color:var(--text)">${tierLabel}</strong>
+      &nbsp;·&nbsp; ${tierCapTxt}
+      ${prefRowsHtml ? `<div class="favor-calc-prefs">${prefRowsHtml}</div>` : ''}
+    </div>`;
+  }
+
+  const resultHtml = _fcBuildResultHtml();
+
+  // NPC input display: show name if selected, search text otherwise
+  const npcInputVal = favorCalcNpcOpen
+    ? favorCalcNpcSearch
+    : (selNpcName || favorCalcNpcSearch);
+  // Item input display
+  const itemCoinValue = !favorCalcItemOpen && selItemName ? _fcGetItemCoinValue(favorCalcItemId) : 0;
+  const itemCoinSuffix = itemCoinValue ? `  🪙 ${itemCoinValue.toLocaleString()} ea` : '';
+  const itemMatchKw = (!favorCalcItemOpen && selItemName && favorCalcNpcKey) ? _fcMatchItemToNpcPref(favorCalcItemId, favorCalcNpcKey) : null;
+  const itemKwSuffix = (itemMatchKw?.quality != null) ? `  Valued as 🪙 ${itemMatchKw.quality}` : '';
+  const itemInputVal = favorCalcItemOpen
+    ? favorCalcItemSearch
+    : (selItemName ? selItemName + itemCoinSuffix + itemKwSuffix : favorCalcItemSearch);
+  const itemInputPrefix = (!favorCalcItemOpen && selItemIcon)
+    ? `<img class="item-icon" src="${selItemIcon}" alt="" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);pointer-events:none">`
+    : '';
+  const itemPaddingLeft = (!favorCalcItemOpen && selItemIcon) ? '30px' : '8px';
+
+  document.getElementById('appContent').innerHTML = `<div class="full-panel">
+    <div class="favor-calc-panel">
+      <div class="favor-calc-title">Favor Calculator</div>
+
+      <div class="favor-calc-row">
+        <div class="favor-calc-label">Character</div>
+        <select class="favor-calc-num-input" style="width:100%;flex:1"
+          onchange="_fcSetChar(this.value)">${charOpts}</select>
+      </div>
+
+      <div class="favor-calc-row">
+        <div class="favor-calc-label">NPC</div>
+        <div class="favor-calc-dd-wrap" id="fcNpcWrap">
+          <input class="favor-calc-dd-input" id="fcNpcInput" type="text"
+            placeholder="Search NPCs…"
+            value="${(npcInputVal).replace(/"/g,'&quot;')}"
+            onfocus="_fcNpcFocus()"
+            oninput="_fcNpcSearch(this.value)"
+            onblur="_fcNpcBlur()">
+          <span class="favor-calc-dd-arrow">▾</span>
+          ${npcDropdown}
+        </div>
+      </div>
+
+      ${tierInfoHtml}
+
+      <div class="favor-calc-row">
+        <div class="favor-calc-label">Item</div>
+        <div class="favor-calc-dd-wrap" id="fcItemWrap" style="position:relative">
+          ${itemInputPrefix}
+          <input class="favor-calc-dd-input" id="fcItemInput" type="text"
+            placeholder="Search items…"
+            value="${itemInputVal.replace(/"/g,'&quot;')}"
+            style="padding-left:${itemPaddingLeft}"
+            onfocus="_fcItemFocus()"
+            oninput="_fcItemSearch(this.value)"
+            onblur="_fcItemBlur()">
+          <span class="favor-calc-dd-arrow">▾</span>
+          ${itemDropdown}
+        </div>
+      </div>
+
+      <div class="favor-calc-row">
+        <div class="favor-calc-label">Favor / item</div>
+        <input class="favor-calc-num-input" type="number" min="1" step="1"
+          placeholder="e.g. 25"
+          value="${favorCalcItemFavor.replace(/"/g,'&quot;')}"
+          oninput="_fcSetItemFavor(this.value)">
+        <span style="font-size:12px;color:var(--text-dim)">favor points per gift</span>
+      </div>
+
+      <div class="favor-calc-row">
+        <div class="favor-calc-label">Current favor</div>
+        <input class="favor-calc-num-input" type="number" min="0" step="1"
+          placeholder="e.g. 450"
+          value="${favorCalcCurrentFavor.replace(/"/g,'&quot;')}"
+          oninput="_fcSetCurrentFavor(this.value)">
+        <span style="font-size:12px;color:var(--text-dim)">points within current tier</span>
+      </div>
+
+      <hr class="favor-calc-divider">
+      <div id="fcResult">${resultHtml}</div>
+    </div>
+  </div>`;
+
+  _fcEnsureClickOutside();
+}
+
+// ── Favor Calculator helpers ──────────────────────────────────────────────────
+function _fcSetChar(id)        { favorCalcCharId = id; favorCalcNpcKey = ''; renderFavorCalcTab(); }
+function _fcSetItemFavor(v) {
+  favorCalcItemFavor = v;
+  const el = document.getElementById('fcResult');
+  if (el) {
+    el.innerHTML = _fcBuildResultHtml();
+    _fcUpdateItemInputDisplay();
+  } else renderFavorCalcTab();
+}
+function _fcGetItemCoinValue(itemId) {
+  // Prefer ITEMS data (index 3) which covers all items; fall back to inventory value
+  const itemData = ITEMS[String(itemId)];
+  if (itemData?.[3]) return itemData[3];
+  const idStr = String(itemId);
+  for (const char of characters) {
+    const entry = char.items?.find(i => String(i.typeId) === idStr);
+    if (entry?.value) return entry.value;
+  }
+  return 0;
+}
+function _fcMatchItemToNpcPref(itemId, npcKey) {
+  // Returns {keyword, quality, pref, desire, favorPerGift} or null
+  const itemData = ITEMS[String(itemId)];
+  const keywords = itemData?.[4]; // array like ["VegetarianDish=84", "Food", ...]
+  if (!keywords?.length) return null;
+  const npcPrefs = NPCS[npcKey]?.prefs || [];
+  let best = null;
+  for (const kw of keywords) {
+    const eqIdx = kw.indexOf('=');
+    const kwName = eqIdx >= 0 ? kw.slice(0, eqIdx) : kw;
+    const quality = eqIdx >= 0 ? parseInt(kw.slice(eqIdx + 1)) : null;
+    const npcPref = npcPrefs.find(p => p.keywords?.includes(kwName));
+    if (!npcPref) continue;
+    const favorPerGift = quality != null ? npcPref.pref * quality : null;
+    if (!best || (favorPerGift != null && (best.favorPerGift == null || favorPerGift > best.favorPerGift))) {
+      best = { keyword: kw, kwName, quality, pref: npcPref.pref, desire: npcPref.desire, favorPerGift };
+    }
+  }
+  return best;
+}
+function _fcUpdateItemInputDisplay() {
+  if (favorCalcItemOpen || !favorCalcItemId) return;
+  const selItem = ITEMS[favorCalcItemId];
+  const selItemName = selItem?.[0] || '';
+  if (!selItemName) return;
+  const coinVal = _fcGetItemCoinValue(favorCalcItemId);
+  const coinSuffix = coinVal ? `  🪙 ${coinVal.toLocaleString()} ea` : '';
+  const matchKw = favorCalcNpcKey ? _fcMatchItemToNpcPref(favorCalcItemId, favorCalcNpcKey) : null;
+  const kwSuffix = (matchKw?.quality != null) ? `  Valued as 🪙 ${matchKw.quality}` : '';
+  const input = document.getElementById('fcItemInput');
+  if (input) input.value = selItemName + coinSuffix + kwSuffix;
+}
+function _fcSetCurrentFavor(v) { favorCalcCurrentFavor = v; const el = document.getElementById('fcResult'); if (el) el.innerHTML = _fcBuildResultHtml(); else renderFavorCalcTab(); }
+
+function _fcBuildResultHtml() {
+  const selChar = characters.find(c => c.id === favorCalcCharId);
+  const currentTierKey = (selChar && favorCalcNpcKey)
+    ? (selChar.charData?.NPCs?.[favorCalcNpcKey]?.FavorLevel || null) : null;
+  const tierKnown = currentTierKey ? FAVOR_TIER_ORDER.includes(currentTierKey) : false;
+  const tierLabel = currentTierKey ? (FAVOR_LABELS[currentTierKey] || currentTierKey) : null;
+  const curFavor = parseFloat(favorCalcCurrentFavor);
+  const perItem  = parseFloat(favorCalcItemFavor);
+  const remaining = (!isNaN(curFavor) && currentTierKey && tierKnown)
+    ? _fcFavorToSoulMates(currentTierKey, curFavor) : null;
+  if (currentTierKey === 'SoulMates') {
+    const calcExtra = (!isNaN(perItem) && perItem > 0)
+      ? `<div class="favor-calc-result-detail" style="margin-top:6px">0 items needed · already at maximum favor</div>` : '';
+    return `<div class="favor-calc-result done">
+      <span class="favor-calc-result-num">✓ Soul Mates</span>
+      Already at maximum favor with this NPC!${calcExtra}</div>`;
+  }
+  if (remaining !== null && !isNaN(perItem) && perItem > 0) {
+    if (remaining <= 0) return `<div class="favor-calc-result done">
+      <span class="favor-calc-result-num">✓ Soul Mates reached!</span>
+      You already have enough favor.</div>`;
+    const needed = Math.ceil(remaining / perItem);
+    const breakdown = _fcTierBreakdown(currentTierKey, curFavor);
+    const breakdownHtml = breakdown
+      ? `<div class="favor-calc-result-detail" style="margin-top:6px">${breakdown} = ${remaining.toLocaleString()} total</div>` : '';
+    return `<div class="favor-calc-result">
+      <span class="favor-calc-result-num">${needed.toLocaleString()} items</span>
+      ${remaining.toLocaleString()} favor needed to reach Soul Mates
+      ${breakdownHtml}
+      <div class="favor-calc-result-detail">${perItem} favor/item × ${needed.toLocaleString()} = ${(needed * perItem).toLocaleString()} favor</div>
+    </div>`;
+  }
+  if (!isNaN(curFavor) && !isNaN(perItem) && perItem > 0 && currentTierKey && !tierKnown) {
+    return `<div class="favor-calc-result empty">Tier "<strong>${tierLabel}</strong>" is not in the favor table — cannot calculate automatically.</div>`;
+  }
+  return `<div class="favor-calc-result empty">Select a character, NPC, and item, then fill in the favor values above.</div>`;
+}
+
+function _fcBuildNpcListHtml() {
+  const selChar = characters.find(c => c.id === favorCalcCharId);
+  const npcQ = favorCalcNpcSearch.toLowerCase();
+  const npcsByArea = {};
+  for (const [key, npc] of Object.entries(NPCS)) {
+    if (!npc.name) continue;
+    if (npcQ && !npc.name.toLowerCase().includes(npcQ) && !(npc.area||'').toLowerCase().includes(npcQ)) continue;
+    const area = npc.area || 'Unknown';
+    if (!npcsByArea[area]) npcsByArea[area] = [];
+    npcsByArea[area].push({ key, npc });
+  }
+  const sortedAreas = Object.keys(npcsByArea).sort();
+  let html = '';
+  for (const area of sortedAreas) {
+    html += `<div class="favor-calc-dd-area-hdr">${area}</div>`;
+    const entries = npcsByArea[area].sort((a, b) => {
+      const aHas = selChar?.charData?.NPCs?.[a.key] ? 1 : 0;
+      const bHas = selChar?.charData?.NPCs?.[b.key] ? 1 : 0;
+      if (bHas !== aHas) return bHas - aHas;
+      return a.npc.name.localeCompare(b.npc.name);
+    });
+    for (const { key, npc } of entries) {
+      const npcData = selChar?.charData?.NPCs?.[key];
+      const hasData = npcData ? ' has-data' : '';
+      const isSel = key === favorCalcNpcKey ? ' selected' : '';
+      const smCheck = npcData?.FavorLevel === 'SoulMates' ? '<span style="color:#7ab880;margin-right:4px">✓</span>' : '';
+      html += `<div class="favor-calc-dd-item${hasData}${isSel}" onmousedown="event.preventDefault();_fcSelectNpc('${key.replace(/'/g,"\\'")}')">
+        ${smCheck}${npc.name}</div>`;
+    }
+  }
+  return html || '<div class="favor-calc-dd-item" style="color:var(--text-dim)">No NPCs found</div>';
+}
+
+function _fcBuildItemListHtml() {
+  const itemQ = favorCalcItemSearch.toLowerCase();
+  if (itemQ.length < 1) return '<div class="favor-calc-dd-item" style="color:var(--text-dim)">Type to search items…</div>';
+  const matches = [];
+  for (const [id, v] of Object.entries(ITEMS)) {
+    if (!Array.isArray(v) || !v[0]) continue;
+    if (!v[0].toLowerCase().includes(itemQ)) continue;
+    matches.push({ id, name: v[0] });
+  }
+  matches.sort((a, b) => a.name.localeCompare(b.name));
+  let html = '';
+  for (const { id, name } of matches.slice(0, 120)) {
+    const iconUrl = getItemIconUrl(id);
+    const iconHtml = iconUrl ? `<img class="item-icon" src="${iconUrl}" alt="">` : '';
+    const isSel = id === favorCalcItemId ? ' selected' : '';
+    html += `<div class="favor-calc-dd-item${isSel}" onmousedown="event.preventDefault();_fcSelectItem('${id}','${name.replace(/'/g,"\\'")}')">
+      ${iconHtml}${name}</div>`;
+  }
+  return html || '<div class="favor-calc-dd-item" style="color:var(--text-dim)">No items found</div>';
+}
+
+function _fcNpcFocus() {
+  if (favorCalcNpcOpen) return; // already open — prevent re-entrancy loop
+  favorCalcNpcOpen = true;
+  favorCalcNpcSearch = '';
+  renderFavorCalcTab();
+  requestAnimationFrame(() => { if (favorCalcNpcOpen) document.getElementById('fcNpcInput')?.focus(); });
+}
+function _fcNpcBlur() { /* blur handled by click-outside */ }
+function _fcNpcSearch(v) {
+  favorCalcNpcSearch = v;
+  const listEl = document.getElementById('fcNpcList');
+  if (listEl) { listEl.innerHTML = _fcBuildNpcListHtml(); return; } // update list in-place, input keeps focus
+  favorCalcNpcOpen = true;
+  renderFavorCalcTab();
+  requestAnimationFrame(() => { if (favorCalcNpcOpen) { const el = document.getElementById('fcNpcInput'); if (el) { el.focus(); el.value = v; } } });
+}
+function _fcSelectNpc(key) {
+  favorCalcNpcKey = key; favorCalcNpcOpen = false; favorCalcNpcSearch = '';
+  // Re-auto-fill favor/item if item already selected
+  if (favorCalcItemId) {
+    const match = _fcMatchItemToNpcPref(favorCalcItemId, key);
+    if (match?.favorPerGift != null) favorCalcItemFavor = String(match.favorPerGift);
+  }
+  renderFavorCalcTab();
+  requestAnimationFrame(_fcUpdateItemInputDisplay);
+}
+
+function _fcItemFocus() {
+  if (favorCalcItemOpen) return; // already open — prevent re-entrancy loop
+  favorCalcItemOpen = true;
+  renderFavorCalcTab();
+  requestAnimationFrame(() => { if (favorCalcItemOpen) document.getElementById('fcItemInput')?.focus(); });
+}
+function _fcItemBlur() { /* blur handled by click-outside */ }
+function _fcItemSearch(v) {
+  favorCalcItemSearch = v;
+  const listEl = document.getElementById('fcItemList');
+  if (listEl) { listEl.innerHTML = _fcBuildItemListHtml(); return; } // update list in-place, input keeps focus
+  favorCalcItemOpen = true;
+  renderFavorCalcTab();
+  requestAnimationFrame(() => { if (favorCalcItemOpen) { const el = document.getElementById('fcItemInput'); if (el) { el.focus(); el.value = v; } } });
+}
+function _fcSelectItem(id, name) {
+  favorCalcItemId = id; favorCalcItemOpen = false; favorCalcItemSearch = '';
+  // Auto-fill favor/item from keyword match if available
+  if (favorCalcNpcKey) {
+    const match = _fcMatchItemToNpcPref(id, favorCalcNpcKey);
+    if (match?.favorPerGift != null) favorCalcItemFavor = String(match.favorPerGift);
+  }
+  renderFavorCalcTab();
+  requestAnimationFrame(_fcUpdateItemInputDisplay);
+}
+
+function _fcEnsureClickOutside() {
+  if (_favorCalcClickListenerAdded) return;
+  _favorCalcClickListenerAdded = true;
+  document.addEventListener('click', e => {
+    if (activeCharId !== '__favorcalc__') return;
+    let changed = false;
+    if (favorCalcNpcOpen && !e.target.closest('#fcNpcWrap')) {
+      favorCalcNpcOpen = false;
+      if (!favorCalcNpcKey) favorCalcNpcSearch = '';
+      changed = true;
+    }
+    if (favorCalcItemOpen && !e.target.closest('#fcItemWrap')) {
+      favorCalcItemOpen = false;
+      if (!favorCalcItemId) favorCalcItemSearch = '';
+      changed = true;
+    }
+    if (changed) renderFavorCalcTab();
+  });
 }
 
 function setVaultAreaFilter(area) {
