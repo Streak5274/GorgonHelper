@@ -4852,8 +4852,8 @@ function scHandleScan(msg) {
       const exactVal  = fb != null ? fb[0] : '';
       const missedVal = fb != null ? fb[1] : '';
       const ocr = fb != null
-        ? `<span style="color:#7ab880;font-size:11px">✓ OCR: ${fb[0]}, ${fb[1]}</span>`
-        : `<span style="color:var(--text-dim);font-size:11px">Enter feedback manually</span>`;
+        ? `<span style="color:#7ab880;font-size:11px">✓ ${fb[0]}, ${fb[1]}</span>`
+        : `<span style="color:var(--text-dim);font-size:11px">Enter below</span>`;
       html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border);flex-wrap:wrap">
         <span style="font-size:11px;color:var(--text-dim);width:24px">#${rowIdx+1}</span>
         <div style="display:flex">${symHtml}</div>

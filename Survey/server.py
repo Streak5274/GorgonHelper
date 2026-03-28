@@ -24,7 +24,9 @@ from config import Config
 from chat_watcher import ChatWatcher
 from survey_store import SurveyStore, SurveyLocation
 from safecracking import (SafecrackingSolver, capture_symbols,
-                           capture_current_slots, capture_guess_history)
+                           capture_current_slots, capture_guess_history,
+                           capture_and_calibrate, load_digit_templates,
+                           calibrated_digit_count)
 from route_solver import nearest_neighbor_route
 from PyQt5.QtWidgets import QApplication
 from ui_inventory_overlay import InventoryOverlay
@@ -212,6 +214,7 @@ class SurveyServer:
         # ── Safecracking state ──────────────────────────────────────────
         self._sc_symbols: List[str] = []          # base64 thumbnails (up to 12)
         self._sc_solver: Optional[SafecrackingSolver] = None
+        load_digit_templates()   # restore any previously learned digit templates
 
         # Region highlighter — transparent border shown while editing coords
         self._highlighter = RegionHighlighter()
@@ -1190,6 +1193,7 @@ class SurveyServer:
             "region": {"x": sc.x, "y": sc.y, "w": sc.w, "h": sc.h},
             "symbols": self._sc_symbols,
             "solver": solver_state,
+            "calibrated_digits": calibrated_digit_count(),
         }
 
     async def _sc_broadcast(self):
@@ -1224,12 +1228,19 @@ class SurveyServer:
         await self._sc_broadcast()
 
     async def _sc_record(self, guess: List[int], exact: int, misplaced: int):
-        """Record a guess result and update solver state."""
+        """Record a guess result, trigger digit calibration, and update solver state."""
         if self._sc_solver is None:
             self._sc_solver = SafecrackingSolver(list(range(1, 13)))
+        # Calibrate digit templates using this guess's feedback (0-based index = current count)
+        guess_index = self._sc_solver.guess_count
         self._sc_solver.record(guess, exact, misplaced)
         log.info("SC record  guess=%s exact=%d misplaced=%d  candidates=%d",
                  guess, exact, misplaced, self._sc_solver.candidates_count)
+        sc = self.config.safecracking_region
+        if sc.w > 0 and sc.h > 0:
+            ok = capture_and_calibrate(sc.x, sc.y, sc.w, sc.h, guess_index, exact, misplaced)
+            log.info("SC calibrate guess=%d ok=%s  digits_known=%d",
+                     guess_index, ok, calibrated_digit_count())
         await self._sc_broadcast()
 
     async def _sc_undo(self):
