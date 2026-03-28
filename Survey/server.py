@@ -33,6 +33,7 @@ from ui_inventory_overlay import InventoryOverlay
 from ui_game_map_overlay import GameMapOverlay
 from ui_region_selector import RegionSelector
 from ui_region_highlighter import RegionHighlighter
+from ui_safecracking_overlay import SafecrackingOverlay
 from inventory_click_watcher import InventoryClickWatcher
 from keyboard_hotkey import KeyboardHotkey
 
@@ -218,6 +219,7 @@ class SurveyServer:
 
         # Region highlighter — transparent border shown while editing coords
         self._highlighter = RegionHighlighter()
+        self._sc_overlay = SafecrackingOverlay()
 
         # Apply saved map region if configured
         if self.config.map_capture.w > 0:
@@ -430,6 +432,12 @@ class SurveyServer:
             await self._sc_undo()
         elif t == "sc_scan_state":
             await self._sc_scan_state()
+        elif t == "sc_show_overlay":
+            self._sc_show_overlay()
+        elif t == "sc_hide_overlay":
+            self._sc_overlay.hide_overlay()
+        elif t == "sc_overlay_next":
+            self._sc_overlay.advance()
         elif t == "cmd_ping":
             await self._send(ws, {"type": "pong"})
         elif t == "cmd_shutdown":
@@ -1242,6 +1250,37 @@ class SurveyServer:
             log.info("SC calibrate guess=%d ok=%s  digits_known=%d",
                      guess_index, ok, calibrated_digit_count())
         await self._sc_broadcast()
+
+    def _sc_symbol_screen_pos(self, symbol_index_1based: int):
+        """Return screen (x, y) centre for symbol N in the game window."""
+        from safecracking import SC_SYMBOL_GRID, SC_GUESS_COLS
+        sc = self.config.safecracking_region
+        if sc.w <= 0 or sc.h <= 0:
+            return None
+        idx = symbol_index_1based - 1
+        grid_col = idx % 6
+        grid_row = idx // 6
+        gl, gt, gw, gh = SC_SYMBOL_GRID
+        cell_w = (gw * sc.w) / 6
+        cell_h = (gh * sc.h) / 2
+        cx = sc.x + gl * sc.w + (grid_col + 0.5) * cell_w
+        cy = sc.y + gt * sc.h + (grid_row + 0.5) * cell_h
+        return int(cx), int(cy)
+
+    def _sc_show_overlay(self) -> None:
+        """Compute symbol screen positions for the current suggestion and show overlay."""
+        if self._sc_solver is None:
+            return
+        suggestion = self._sc_solver.suggest()
+        if not suggestion:
+            return
+        positions = []
+        for sym_idx in suggestion:
+            pos = self._sc_symbol_screen_pos(sym_idx)
+            if pos:
+                positions.append(pos)
+        if positions:
+            self._sc_overlay.show_suggestion(positions, suggestion)
 
     async def _sc_undo(self):
         """Undo the last recorded guess."""

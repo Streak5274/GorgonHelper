@@ -4925,12 +4925,15 @@ function renderSafecrackingTab() {
   } else if (solved) {
     const sol = solver.candidates === 1 ? solver.suggestion : null;
     const solHtml = sol ? sol.map(v => `<span style="display:inline-block;border:2px solid var(--gold);border-radius:6px;padding:2px 4px;margin:0 2px"><img src="data:image/png;base64,${symbols[v-1]}" style="width:36px;height:36px;vertical-align:middle;border-radius:4px"> <span style="font-size:12px;color:var(--text-dim)">${v}</span></span>`).join('') : '';
-    bannerHtml = `<div style="color:#7ab880;font-size:14px;font-weight:600;margin-bottom:6px">✓ Solution found! Enter this combination:</div>${solHtml}`;
+    bannerHtml = `<div style="color:#7ab880;font-size:14px;font-weight:600;margin-bottom:6px">✓ Solution found! Enter this combination:</div>${solHtml}<div style="margin-top:8px"><button class="sync-btn" onclick="scSend({type:'sc_show_overlay'})" style="font-size:12px;padding:4px 14px;border-color:#7ab880;color:#7ab880" title="Highlight each symbol in game window">▶ Show in Game</button></div>`;
   } else if (suggestion) {
     const sugHtml = suggestion.map(v => `<span style="display:inline-block;border:2px solid var(--gold-dim);border-radius:6px;padding:2px 4px;margin:0 2px;cursor:pointer" onclick="scApplySuggestion()" title="Click to fill guess"><img src="data:image/png;base64,${symbols[v-1]}" style="width:36px;height:36px;vertical-align:middle;border-radius:4px"> <span style="font-size:12px;color:var(--text-dim)">${v}</span></span>`).join('');
     bannerHtml = `<div style="color:var(--gold);font-size:12px;margin-bottom:6px;font-weight:600">SUGGESTED GUESS (${candidates} candidates remain):</div>
       <div style="margin-bottom:8px">${sugHtml}</div>
-      <button class="sync-btn" onclick="scApplySuggestion()" style="font-size:12px;padding:4px 14px;background:var(--gold-dim);border-color:var(--gold);color:var(--gold)">↓ Fill into guess</button>`;
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="sync-btn" onclick="scApplySuggestion()" style="font-size:12px;padding:4px 14px;background:var(--gold-dim);border-color:var(--gold);color:var(--gold)">↓ Fill into guess</button>
+        <button class="sync-btn" onclick="scSend({type:'sc_show_overlay'})" style="font-size:12px;padding:4px 14px;border-color:var(--gold-dim);color:var(--gold)" title="Highlight each symbol in the game window one by one">▶ Show in Game</button>
+      </div>`;
   }
 
   // History rows
