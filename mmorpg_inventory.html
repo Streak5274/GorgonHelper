@@ -465,8 +465,13 @@ let dataLoaded = { items: false, recipes: false, itemuses: false, sources_recipe
 let dataVersions = {}; // key -> version string read from _version field
 
 // ── Player log data ──
-let playerLogNpcs = {};      // npcKey → {currentGold, maxGold, resetField, favorLevel, loggedAt}
-let playerLogNpcIdMap = {};  // numericId → npcKey (learned from ProcessStartInteraction/ProcessDeltaFavor)
+let playerLogData = {};         // charName → { npcs: {npcKey→{currentGold,maxGold,resetAt,favorLevel,loggedAt}}, idMap: {id→npcKey} }
+let currentLogChar = '';        // character name detected from ProcessAddPlayer
+let playerLogFileHandle = null; // FileSystem Access API file handle
+let playerLogFileSize = 0;      // bytes read so far (incremental polling)
+let playerLogWatchActive = false;
+let playerLogWatchTimer = null;
+let playerLogLastUpdate = 0;    // timestamp of last new data parsed
 
 // ═══════════════════════════════════════════════════════════
 // INDEXEDDB — single DB, multiple stores
@@ -476,13 +481,14 @@ let db = null;
 
 function openDB() {
   return new Promise((res, rej) => {
-    const req = indexedDB.open(IDB_NAME, 3);
+    const req = indexedDB.open(IDB_NAME, 4);
     req.onupgradeneeded = e => {
       const d = e.target.result;
-      if (!d.objectStoreNames.contains('folder_handle')) d.createObjectStore('folder_handle');
-      if (!d.objectStoreNames.contains('wo_limits'))     d.createObjectStore('wo_limits');
-      if (!d.objectStoreNames.contains('wo_completed'))  d.createObjectStore('wo_completed');
-      if (!d.objectStoreNames.contains('pinned_skills')) d.createObjectStore('pinned_skills'); // charId -> [skillName,...]
+      if (!d.objectStoreNames.contains('folder_handle'))    d.createObjectStore('folder_handle');
+      if (!d.objectStoreNames.contains('wo_limits'))        d.createObjectStore('wo_limits');
+      if (!d.objectStoreNames.contains('wo_completed'))     d.createObjectStore('wo_completed');
+      if (!d.objectStoreNames.contains('pinned_skills'))    d.createObjectStore('pinned_skills');
+      if (!d.objectStoreNames.contains('player_log_handle')) d.createObjectStore('player_log_handle');
     };
     req.onsuccess = e => { db = e.target.result; res(db); };
     req.onerror = () => rej();
@@ -2238,76 +2244,127 @@ function buildFavorTrainingPanel(npcKey, chars) {
 
 // ── Player log parsing ──────────────────────────────────────
 
-function loadPlayerLogFromStorage() {
+function loadPlayerLogData() {
   try {
-    const d = localStorage.getItem('pgPlayerLogNpcs');
-    if (d) playerLogNpcs = JSON.parse(d);
-    const m = localStorage.getItem('pgPlayerLogNpcIdMap');
-    if (m) playerLogNpcIdMap = JSON.parse(m);
+    const s = localStorage.getItem('pgPlayerLogData');
+    if (s) { const p = JSON.parse(s); playerLogData = p.data || {}; currentLogChar = p.char || ''; }
+    // Migrate old keys
+    localStorage.removeItem('pgPlayerLogNpcs');
+    localStorage.removeItem('pgPlayerLogNpcIdMap');
   } catch(e) {}
 }
 
-function parsePlayerLog(text) {
-  const lines = text.split('\n');
+function savePlayerLogData() {
+  try { localStorage.setItem('pgPlayerLogData', JSON.stringify({ data: playerLogData, char: currentLogChar })); } catch(e) {}
+}
+
+function parsePlayerLogLines(lines) {
   let vendorCount = 0;
   for (const line of lines) {
-    // Learn id→npcKey from ProcessStartInteraction
-    let m = line.match(/ProcessStartInteraction\((\d+),.*?"(NPC_\w+)"\)/);
-    if (m) { playerLogNpcIdMap[m[1]] = m[2]; continue; }
-    // Learn id→npcKey from ProcessDeltaFavor
+    // Detect current player: ProcessAddPlayer(id, n, "AppearanceStr", "CharName", ...)
+    let m = line.match(/ProcessAddPlayer\([^,]+,\s*[^,]+,\s*"[^"]*",\s*"([^"]+)"/);
+    if (m) { currentLogChar = m[1]; continue; }
+
+    const char = currentLogChar;
+    if (!char) continue;
+    if (!playerLogData[char]) playerLogData[char] = { npcs: {}, idMap: {} };
+    const d = playerLogData[char];
+
+    // Learn id→npcKey from ProcessStartInteraction(id, ..., "NPC_Name")
+    m = line.match(/ProcessStartInteraction\((\d+),.*?"(NPC_\w+)"\)/);
+    if (m) { d.idMap[m[1]] = m[2]; continue; }
+    // Learn id→npcKey from ProcessDeltaFavor(id, "NPC_Name", ...)
     m = line.match(/ProcessDeltaFavor\((\d+),\s*"(NPC_\w+)"/);
-    if (m) { playerLogNpcIdMap[m[1]] = m[2]; continue; }
-    // Vendor data from ProcessVendorScreen(id, favorLevel, currentGold, resetField, maxGold, ...)
+    if (m) { d.idMap[m[1]] = m[2]; continue; }
+    // Vendor data: ProcessVendorScreen(id, favorLevel, currentGold, resetAt, maxGold, ...)
     m = line.match(/ProcessVendorScreen\((\d+),\s*(\w+),\s*(\d+),\s*(\d+),\s*(\d+)/);
     if (m) {
-      const [, id, favorLevel, currentGold, resetField, maxGold] = m;
-      const npcKey = playerLogNpcIdMap[id];
+      const npcKey = d.idMap[m[1]];
       if (npcKey) {
-        playerLogNpcs[npcKey] = {
-          currentGold: +currentGold, maxGold: +maxGold,
-          resetField: +resetField, favorLevel,
-          loggedAt: Date.now()
-        };
+        d.npcs[npcKey] = { currentGold: +m[3], maxGold: +m[5], resetAt: +m[4], favorLevel: m[2], loggedAt: Date.now() };
         vendorCount++;
       }
     }
   }
-  try {
-    localStorage.setItem('pgPlayerLogNpcs', JSON.stringify(playerLogNpcs));
-    localStorage.setItem('pgPlayerLogNpcIdMap', JSON.stringify(playerLogNpcIdMap));
-  } catch(e) {}
+  if (vendorCount > 0) playerLogLastUpdate = Date.now();
+  savePlayerLogData();
   return vendorCount;
 }
 
-function pickPlayerLog() {
-  const inp = document.createElement('input');
-  inp.type = 'file';
-  inp.accept = '.log,.txt,*';
-  inp.onchange = async () => {
-    const f = inp.files[0];
-    if (!f) return;
-    const text = await f.text();
-    const count = parsePlayerLog(text);
-    showToast(`Loaded ${count} NPC vendor entries from player.log`);
+// ── Player log file watcher ──────────────────────────────────
+
+async function watchPlayerLog() {
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      types: [{ description: 'Log files', accept: { 'text/plain': ['.log', '.txt'] } }],
+      excludeAcceptAllOption: false,
+    });
+    playerLogFileHandle = handle;
+    playerLogFileSize = 0;
+    playerLogWatchActive = true;
+    await dbPut('player_log_handle', 'handle', handle);
+    startPlayerLogWatcher();
     if (mainTab === 'settings') renderSettingsTab();
-    if (mainTab === 'favors') renderFavorsTab();
-  };
-  inp.click();
+  } catch(e) { /* user cancelled */ }
+}
+
+function stopPlayerLogWatch() {
+  if (playerLogWatchTimer) { clearInterval(playerLogWatchTimer); playerLogWatchTimer = null; }
+  playerLogWatchActive = false;
+  if (mainTab === 'settings') renderSettingsTab();
+}
+
+function startPlayerLogWatcher() {
+  if (playerLogWatchTimer) clearInterval(playerLogWatchTimer);
+  playerLogWatchTimer = setInterval(pollPlayerLog, 2000);
+  pollPlayerLog();
+}
+
+async function pollPlayerLog() {
+  if (!playerLogFileHandle) return;
+  try {
+    const file = await playerLogFileHandle.getFile();
+    if (file.size <= playerLogFileSize) return;
+    const blob = file.slice(playerLogFileSize);
+    const text = await blob.text();
+    playerLogFileSize = file.size;
+    const lines = text.split('\n');
+    const count = parsePlayerLogLines(lines);
+    if (count > 0 && mainTab === 'favors') renderFavorsTab();
+    if (mainTab === 'settings') renderSettingsTab();
+  } catch(e) {
+    // File moved or permission lost
+    playerLogWatchActive = false;
+    if (mainTab === 'settings') renderSettingsTab();
+  }
+}
+
+async function resumePlayerLogWatch() {
+  try {
+    const handle = await dbGet('player_log_handle', 'handle');
+    if (!handle) return;
+    const perm = await handle.queryPermission({ mode: 'read' });
+    if (perm === 'granted') {
+      playerLogFileHandle = handle;
+      playerLogWatchActive = true;
+      startPlayerLogWatcher();
+    }
+  } catch(e) {}
 }
 
 function clearPlayerLogData() {
-  playerLogNpcs = {};
-  playerLogNpcIdMap = {};
-  localStorage.removeItem('pgPlayerLogNpcs');
-  localStorage.removeItem('pgPlayerLogNpcIdMap');
+  playerLogData = {};
+  currentLogChar = '';
+  playerLogLastUpdate = 0;
+  localStorage.removeItem('pgPlayerLogData');
   if (mainTab === 'settings') renderSettingsTab();
   if (mainTab === 'favors') renderFavorsTab();
 }
 
-function formatGoldReset(resetField) {
-  // Try as Unix ms timestamp (game stores reset-at time in ms)
+function formatGoldReset(resetAt) {
+  // resetAt is a Unix timestamp in ms for when gold resets
   const now = Date.now();
-  const diff = resetField - now;
+  const diff = resetAt - now;
   if (diff > 0 && diff < 30 * 86400 * 1000) {
     const days = Math.floor(diff / 86400000);
     const hours = Math.floor((diff % 86400000) / 3600000);
@@ -2320,12 +2377,13 @@ function formatGoldReset(resetField) {
   return '?';
 }
 
-function buildFavorVendorPanel(npcKey) {
-  const v = playerLogNpcs[npcKey];
+function buildFavorVendorPanel(npcKey, charName) {
+  const charData = charName ? playerLogData[charName] : null;
+  const v = charData?.npcs[npcKey];
   if (!v) return '';
   const pct = v.maxGold > 0 ? Math.round(v.currentGold / v.maxGold * 100) : 0;
   const goldColor = pct > 60 ? 'var(--gold)' : pct > 20 ? 'var(--orange)' : '#e07070';
-  const resetStr = formatGoldReset(v.resetField);
+  const resetStr = formatGoldReset(v.resetAt);
   const loggedAgo = Math.round((Date.now() - v.loggedAt) / 60000);
   const agoStr = loggedAgo < 60 ? `${loggedAgo}m ago` : `${Math.round(loggedAgo/60)}h ago`;
   return `<div style="padding:8px 4px 6px">
@@ -2336,7 +2394,33 @@ function buildFavorVendorPanel(npcKey) {
       </div>
       <span style="font-size:13px;color:var(--gold-light);font-family:'Cinzel',serif;white-space:nowrap">🪙 ${v.currentGold.toLocaleString()} / ${v.maxGold.toLocaleString()}</span>
     </div>
-    <div style="font-size:11px;color:var(--text-dim);margin-top:5px">Gold resets in: <span style="color:var(--text)">${resetStr}</span></div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:5px">Resets in: <span style="color:var(--text)">${resetStr}</span>
+      <span style="margin-left:10px">Favor: <span style="color:var(--gold)">${v.favorLevel}</span></span>
+    </div>
+  </div>`;
+}
+
+function buildFavorVendorPanelAllChars(npcKey, charList) {
+  // For All Characters mode: show per-character vendor panels
+  const panels = charList.map(char => {
+    const charName = char.charData?.Character;
+    const v = charName ? playerLogData[charName]?.npcs[npcKey] : null;
+    if (!v) return '';
+    const pct = v.maxGold > 0 ? Math.round(v.currentGold / v.maxGold * 100) : 0;
+    const goldColor = pct > 60 ? 'var(--gold)' : pct > 20 ? 'var(--orange)' : '#e07070';
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span style="font-size:10px;color:var(--text-dim);min-width:70px;flex-shrink:0">${char.charData.Character}</span>
+      <div style="flex:1;background:var(--bg3);border-radius:3px;height:5px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${goldColor};border-radius:3px"></div>
+      </div>
+      <span style="font-size:11px;color:var(--gold-light);white-space:nowrap">🪙 ${v.currentGold.toLocaleString()} / ${v.maxGold.toLocaleString()}</span>
+      <span style="font-size:10px;color:var(--text-dim)">resets ${formatGoldReset(v.resetAt)}</span>
+    </div>`;
+  }).filter(Boolean).join('');
+  if (!panels) return '';
+  return `<div style="padding:8px 4px 6px">
+    <div style="font-family:'Cinzel',serif;font-size:9px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;padding-bottom:3px;border-bottom:1px solid var(--border)">Vendor Gold</div>
+    ${panels}
   </div>`;
 }
 
@@ -2349,7 +2433,7 @@ function renderFavorsTab() {
     return;
   }
 
-  // Build merged NPC list: npcKey -> { name, area, desc, chars: {charId: favorLevel} }
+  // Build merged NPC list: npcKey -> { name, area, desc, chars: {charId: favorLevel}, logOnly? }
   const npcMap = {};
   for (const char of chars) {
     for (const [npcKey, npcData] of Object.entries(char.charData.NPCs || {})) {
@@ -2369,6 +2453,46 @@ function renderFavorsTab() {
     }
   }
 
+  // Add log-only NPCs (seen in player.log but not in character export)
+  const singleCharName = !showAll && chars.length === 1 ? chars[0].charData?.Character : null;
+  if (singleCharName && playerLogData[singleCharName]) {
+    for (const npcKey of Object.keys(playerLogData[singleCharName].npcs)) {
+      if (!npcMap[npcKey]) {
+        const info = NPCS[npcKey];
+        npcMap[npcKey] = {
+          key: npcKey,
+          name: info?.name || npcKey.replace('NPC_','').replace(/_/g,' '),
+          area: info?.area || '',
+          desc: info?.desc || '',
+          prefs: info?.prefs || [],
+          chars: {},
+          logOnly: true
+        };
+      }
+    }
+  }
+  // In All Characters mode, add log-only NPCs from all chars
+  if (showAll) {
+    for (const char of chars) {
+      const cn = char.charData?.Character;
+      if (!cn || !playerLogData[cn]) continue;
+      for (const npcKey of Object.keys(playerLogData[cn].npcs)) {
+        if (!npcMap[npcKey]) {
+          const info = NPCS[npcKey];
+          npcMap[npcKey] = {
+            key: npcKey,
+            name: info?.name || npcKey.replace('NPC_','').replace(/_/g,' '),
+            area: info?.area || '',
+            desc: info?.desc || '',
+            prefs: info?.prefs || [],
+            chars: {},
+            logOnly: true
+          };
+        }
+      }
+    }
+  }
+
   // Collect all areas
   const areaSet = new Map();
   for (const npc of Object.values(npcMap)) {
@@ -2383,11 +2507,14 @@ function renderFavorsTab() {
     const q = favorSearchQ.toLowerCase();
     npcs = npcs.filter(n => n.name.toLowerCase().includes(q) || n.area.toLowerCase().includes(q));
   }
-  // Sort: by highest favor (across chars) desc, then name
+  // Sort: log-only NPCs last, then by highest favor (across chars) desc, then name
   const favorRank = f => FAVOR_LEVELS_ALL.indexOf(f);
   npcs.sort((a, b) => {
-    const aMax = Math.max(...Object.values(a.chars).map(favorRank));
-    const bMax = Math.max(...Object.values(b.chars).map(favorRank));
+    if (a.logOnly !== b.logOnly) return a.logOnly ? 1 : -1;
+    const aVals = Object.values(a.chars);
+    const bVals = Object.values(b.chars);
+    const aMax = aVals.length ? Math.max(...aVals.map(favorRank)) : -1;
+    const bMax = bVals.length ? Math.max(...bVals.map(favorRank)) : -1;
     if (bMax !== aMax) return bMax - aMax;
     return a.name.localeCompare(b.name);
   });
@@ -2414,28 +2541,34 @@ function renderFavorsTab() {
             ${renderFavorCell(favor)}
           </div>`;
         }).filter(Boolean).join('')}</td>`
-      : `<td class="favor-bar-cell">${renderFavorCell(Object.values(npc.chars)[0] || 'Neutral')}</td>`;
+      : npc.logOnly
+        ? `<td class="favor-bar-cell"><span style="font-size:11px;color:var(--text-dim)">—</span></td>`
+        : `<td class="favor-bar-cell">${renderFavorCell(Object.values(npc.chars)[0] || 'Neutral')}</td>`;
 
     const safeKey = npc.key.replace(/'/g,"\\'");
     const hasTraining = dataLoaded.npc_training && NPC_TRAINING[npc.key]?.length > 0;
-    const hasVendorData = !!playerLogNpcs[npc.key];
+    const hasVendorData = isAll
+      ? charList.some(c => playerLogData[c.charData?.Character]?.npcs[npc.key])
+      : !!(singleCharName && playerLogData[singleCharName]?.npcs[npc.key]);
     const hasExpand = hasTraining || hasVendorData;
     const expanded = expandedFavorNpcs.has(npc.key);
     const toggleIcon = hasExpand ? `<span style="font-size:10px;color:var(--text-dim);margin-left:5px">${expanded ? '▲' : '▼'}</span>` : '';
 
     const detailRow = (hasExpand && expanded)
       ? `<tr><td colspan="2" style="padding:0 8px 10px 12px;background:var(--bg2);border-bottom:1px solid var(--border)">
-          ${buildFavorVendorPanel(npc.key)}
+          ${isAll ? buildFavorVendorPanelAllChars(npc.key, charList) : buildFavorVendorPanel(npc.key, singleCharName)}
           ${hasTraining ? buildFavorTrainingPanel(npc.key, charList) : ''}
         </td></tr>`
       : '';
+
+    const logOnlyBadge = npc.logOnly ? `<span style="font-size:9px;color:var(--text-dim);margin-left:5px;border:1px solid var(--border);border-radius:3px;padding:0 3px">vendor</span>` : '';
 
     return `<tr class="favor-row" style="${hasExpand ? 'cursor:pointer' : ''}"
       onclick="${hasExpand ? `toggleFavorNpc('${safeKey}')` : ''}"
       onmouseenter="showNpcPrefTooltip('${safeKey}', event)"
       onmouseleave="hideNpcPrefTooltip()">
       <td>
-        <div class="favor-npc-name">${npc.name}${toggleIcon}</div>
+        <div class="favor-npc-name">${npc.name}${logOnlyBadge}${toggleIcon}</div>
         ${npc.area ? `<div class="favor-npc-area">${npc.area}</div>` : ''}
       </td>
       ${favorCell}
@@ -4221,36 +4354,39 @@ function renderSettingsTab() {
 
   <div class="settings-section" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px">
     <div class="settings-title">📋 Player Log</div>
-    <div class="settings-meta" style="margin-bottom:10px">Load <code style="color:var(--gold)">player.log</code> to track NPC vendor gold amounts and reset times. Data is stored in the browser and persists across sessions.</div>
-    <div class="settings-row">
+    <div class="settings-meta" style="margin-bottom:10px">Actively watch <code style="color:var(--gold)">player.log</code> to track NPC vendor gold, reset times, and favor in real time. Polls every 2 seconds for new lines.</div>
+
+    <!-- Watch status row -->
+    <div class="settings-row" style="margin-bottom:8px">
       <div>
-        <div class="settings-label">NPC vendor entries tracked</div>
-        <div class="settings-meta">
-          ${Object.keys(playerLogNpcs).length === 0
-            ? 'No data — load player.log to begin'
-            : `${Object.keys(playerLogNpcs).length} NPCs · ${Object.keys(playerLogNpcIdMap).length} IDs learned`}
-        </div>
+        ${playerLogWatchActive
+          ? `<div class="settings-label" style="color:#7ab880">● Watching player.log</div>
+             <div class="settings-meta">${playerLogFileHandle ? playerLogFileHandle.name : ''}
+               ${currentLogChar ? ` · Player: <strong style="color:var(--text)">${currentLogChar}</strong>` : ''}
+               ${playerLogLastUpdate ? ` · Updated ${Math.round((Date.now()-playerLogLastUpdate)/60000)}m ago` : ''}
+             </div>`
+          : `<div class="settings-label" style="color:var(--text-dim)">○ Not watching</div>
+             <div class="settings-meta">Select player.log to begin live tracking</div>`
+        }
       </div>
       <div style="display:flex;gap:6px">
-        <button class="sync-btn" onclick="pickPlayerLog()">📂 Load player.log</button>
-        ${Object.keys(playerLogNpcs).length > 0 ? `<button class="sync-btn danger" onclick="clearPlayerLogData()">✕ Clear</button>` : ''}
+        ${playerLogWatchActive
+          ? `<button class="sync-btn" onclick="stopPlayerLogWatch()">■ Stop</button>`
+          : `<button class="sync-btn" style="background:var(--gold-dim);border-color:var(--gold);color:var(--gold)" onclick="watchPlayerLog()">📂 Watch player.log</button>`
+        }
       </div>
     </div>
-    ${Object.keys(playerLogNpcs).length > 0 ? `
-    <div style="margin-top:10px;max-height:180px;overflow-y:auto;font-size:11px;color:var(--text-dim)">
-      ${Object.entries(playerLogNpcs).sort((a,b)=>b[1].loggedAt-a[1].loggedAt).slice(0,20).map(([k,v]) => {
-        const name = NPCS[k]?.name || k.replace('NPC_','').replace(/_/g,' ');
-        const pct = v.maxGold > 0 ? Math.round(v.currentGold / v.maxGold * 100) : 0;
-        const agoMs = Date.now() - v.loggedAt;
-        const agoStr = agoMs < 3600000 ? `${Math.round(agoMs/60000)}m ago` : `${Math.round(agoMs/3600000)}h ago`;
-        return `<div class="settings-row" style="padding:3px 0">
-          <span style="min-width:140px">${name}</span>
-          <span style="color:var(--gold)">🪙 ${v.currentGold.toLocaleString()} / ${v.maxGold.toLocaleString()}</span>
-          <span style="margin-left:8px">(${pct}%)</span>
-          <span style="margin-left:auto;color:var(--text-dim)">${agoStr}</span>
-        </div>`;
-      }).join('')}
-    </div>` : ''}
+
+    <!-- Data summary -->
+    ${(() => {
+      const totalNpcs = Object.values(playerLogData).reduce((s,d) => s + Object.keys(d.npcs).length, 0);
+      const charCount = Object.keys(playerLogData).length;
+      if (totalNpcs === 0) return '';
+      return `<div class="settings-row" style="margin-top:4px">
+        <div class="settings-meta">${totalNpcs} NPC vendor entries across ${charCount} character${charCount!==1?'s':''}</div>
+        <button class="sync-btn danger" onclick="clearPlayerLogData()">✕ Clear all data</button>
+      </div>`;
+    })()}
   </div>
 
   <div class="settings-section" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px">
@@ -5497,7 +5633,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   await loadWOLimits();
   await loadWOCompleted();
   await loadPinnedSkills();
-  loadPlayerLogFromStorage();
+  loadPlayerLogData();
+  await resumePlayerLogWatch();
 
   // Restore survey tab visibility preference
   if (localStorage.getItem('showSurveyTab') === '1') setSurveyTabVisible(true, false);
