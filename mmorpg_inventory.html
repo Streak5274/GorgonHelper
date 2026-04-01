@@ -870,10 +870,10 @@ async function tryLoadDataFromFolder(jsonFiles) {
     } catch(e) {}
   }
 
-  // Load originals from the Originals/ subfolder
+  // Load originals from the Json/ subfolder
   if (!folderHandle) return;
   let originalsDir;
-  try { originalsDir = await folderHandle.getDirectoryHandle('Originals'); } catch(e) { return; }
+  try { originalsDir = await folderHandle.getDirectoryHandle('Json'); } catch(e) { return; }
   for (const df of DATA_FILES) {
     if (!df.originals || dataLoaded[df.key]) continue;
     try {
@@ -4557,7 +4557,7 @@ async function getCDNVersion() {
   return _cdnVersion;
 }
 const DATA_FILES = [
-  // Files with CDN equivalents live in Originals/ and are synced directly from the game CDN.
+  // Files with CDN equivalents live in Json/ and are synced directly from the game CDN.
   // raw:true means the file is in the original CDN format and needs processCDNData() before applyGameData().
   { key:'items',           file:'items.json',           originals:true, cdn:'items.json',           label:'Items',           desc:'Item names, max stack sizes' },
   { key:'recipes',         file:'recipes.json',         originals:true, cdn:'recipes.json',         label:'Recipes',         desc:'All crafting recipes' },
@@ -4770,7 +4770,7 @@ function renderSettingsTab() {
     const loaded = dataLoaded[df.key];
     const statusClass = loaded ? 'ok' : 'missing';
     const statusText = loaded ? '✓ Loaded' : '✗ Not loaded';
-    const filePath = df.originals ? `Originals/${df.file}` : df.file;
+    const filePath = df.originals ? `Json/${df.file}` : df.file;
     const syncBtn = df.cdn
       ? `<button class="sync-btn" id="syncbtn_${df.key}" onclick="syncFile('${df.key}')">↓ Sync</button>`
       : `<span style="font-size:11px;color:var(--text-dim)">manual only</span>`;
@@ -4801,7 +4801,7 @@ function renderSettingsTab() {
   <div class="settings-section" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px">
     <div class="settings-title">Game Data Files</div>
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;line-height:1.7">
-      Loaded from <code style="font-size:10px">Originals/</code> subfolder in your watched folder.
+      Loaded from <code style="font-size:10px">Json/</code> subfolder in your watched folder.
       Use <strong>Sync</strong> to download the latest version directly from the Project: Gorgon CDN and save it to disk.
     </div>
     ${rowsHtml}
@@ -4914,7 +4914,7 @@ async function syncFile(key) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const raw = await res.json();
     applyGameData(key, processCDNData(key, raw));
-    // Save raw file to Originals/ folder so it persists across page reloads
+    // Save raw file to Json/ folder so it persists across page reloads
     if (folderHandle) {
       try {
         const originalsDir = await folderHandle.getDirectoryHandle('Originals', { create: true });

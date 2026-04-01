@@ -13,7 +13,10 @@ pg_landmarks.zip
 
 .claude/
 Original/
-Originals/
+
+# pg_* files replaced by Json/ folder (CDN originals)
+pg_*.json
+RecycleBin/
 
 # Python
 __pycache__/
@@ -21,3 +24,6 @@ __pycache__/
 
 # Survey runtime data (config, saved state)
 Survey/data/
+
+# Wiki marked maps (downloaded for calibration, not tracked)
+Maps/marked/
