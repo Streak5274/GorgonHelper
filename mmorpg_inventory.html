@@ -889,10 +889,12 @@ function applyGameData(key, data) {
     ITEMS = data; dataLoaded.items = true;
     _woResolveCache = {}; _resultNormToRecipe = null;
     // Build iconId map from new [name, maxStack, iconId] format
-    ITEMS_ICONS = {}; ITEMS_BY_NAME = {};
+    ITEMS_ICONS = {}; ITEMS_BY_NAME = {}; ITEMS_BY_INTERNAL_NAME = {};
     for (const [id, v] of Object.entries(data)) {
-      if (Array.isArray(v) && v[2]) ITEMS_ICONS[id] = v[2];
-      if (Array.isArray(v) && v[0]) ITEMS_BY_NAME[v[0].toLowerCase()] = id;
+      if (!Array.isArray(v)) continue;
+      if (v[2]) ITEMS_ICONS[id] = v[2];
+      if (v[0]) ITEMS_BY_NAME[v[0].toLowerCase()] = id;
+      if (v[3]) ITEMS_BY_INTERNAL_NAME[v[3]] = id;
     }
   }
   if (key === 'recipes')         { RECIPES = data; dataLoaded.recipes = true; buildRecipeCaches(); }
@@ -4561,10 +4563,10 @@ const DATA_FILES = [
   // raw:true means the file is in the original CDN format and needs processCDNData() before applyGameData().
   { key:'items',           file:'items.json',           originals:true, cdn:'items.json',           label:'Items',           desc:'Item names, max stack sizes' },
   { key:'recipes',         file:'recipes.json',         originals:true, cdn:'recipes.json',         label:'Recipes',         desc:'All crafting recipes' },
+  { key:'npcs',            file:'npcs.json',            originals:true, cdn:'npcs.json',            label:'NPCs',            desc:'NPC names, locations, services' },
   { key:'itemuses',        file:'itemuses.json',        originals:true, cdn:'itemuses.json',         label:'Item Uses',       desc:'Which recipes use each item' },
   { key:'sources_recipes', file:'sources_recipes.json', originals:true, cdn:'sources_recipes.json', label:'Recipe Sources',  desc:'How/where to learn each recipe' },
   { key:'sources_items',   file:'sources_items.json',   originals:true, cdn:'sources_items.json',   label:'Item Sources',    desc:'Vendors, hangouts, gifts per item' },
-  { key:'npcs',            file:'npcs.json',            originals:true, cdn:'npcs.json',            label:'NPCs',            desc:'NPC names, locations, services' },
   { key:'vaults',          file:'storagevaults.json',   originals:true, cdn:'storagevaults.json',   label:'Storage Vaults',  desc:'Vault slot counts and NPC levels' },
   { key:'quests',          file:'quests.json',          originals:true, cdn:'quests.json',          label:'Quests',          desc:'Quest objectives and locations' },
   // No CDN equivalent — loaded from pg_ files in the root folder
@@ -4621,7 +4623,8 @@ function getItemIconUrl(typeId) {
 }
 
 let ITEMS_ICONS = {}; // typeId -> iconId (built from items data if available)
-let ITEMS_BY_NAME = {}; // lowercase item name -> typeId (fallback for WO icons)
+let ITEMS_BY_NAME = {}; // lowercase display name -> typeId (fallback for WO icons)
+let ITEMS_BY_INTERNAL_NAME = {}; // internalName -> typeId (for quest item lookups)
 
 // Get icon ID for a work order — tries recipe result first, then item name lookup
 function getWOIconId(woKey, recipe) {
@@ -4942,7 +4945,7 @@ async function syncAllFiles() { for (const df of DATA_FILES) { if (df.cdn) await
 function processCDNData(key, raw) {
   if (key === 'items') {
     const out = {};
-    for (const [k,v] of Object.entries(raw)) { const id=k.split('_')[1]; if(id) out[id]=[v.Name||'',v.MaxStackSize||1]; }
+    for (const [k,v] of Object.entries(raw)) { const id=k.split('_')[1]; if(id) out[id]=[v.Name||'',v.MaxStackSize||1,v.IconId||0,v.InternalName||'']; }
     return out;
   }
   if (key === 'recipes') {
@@ -5056,6 +5059,32 @@ function processCDNData(key, raw) {
         return acc;
       }, []);
       if (entries.length) out[tid] = entries;
+    }
+    return out;
+  }
+  if (key === 'quests') {
+    const out = {};
+    for (const [, v] of Object.entries(raw)) {
+      const internal = v.InternalName; if (!internal) continue;
+      // Extract NPC key from "AreaFoo/NPC_Bar" format
+      const npcPath = v.FavorNpc || v.QuestNpc || '';
+      const npcKey = npcPath.includes('/') ? npcPath.split('/')[1] : npcPath;
+      const npcData = NPCS[npcKey] || {};
+      const objs = (v.Objectives || []).map(o => {
+        const obj = { t: o.Type || '', d: o.Description || '', n: o.Number || 1 };
+        if (o.ItemName) {
+          const tid = ITEMS_BY_INTERNAL_NAME[o.ItemName];
+          if (tid) obj.tid = parseInt(tid);
+        }
+        return obj;
+      });
+      out[internal] = {
+        name: v.Name || internal,
+        npc: npcKey || null,
+        npcName: npcData.name || (npcKey ? npcKey.replace('NPC_', '') : ''),
+        loc: npcData.area || v.DisplayedLocation || '',
+        objs,
+      };
     }
     return out;
   }
