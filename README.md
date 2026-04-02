@@ -55,7 +55,11 @@ The tool will automatically load your character files and keep them up to date.
 
 > **On subsequent visits Chrome may show a permission popup** asking to allow access to the folders you previously selected (`Player.log` and `Reports`). Click **Allow on every visit** to avoid being asked again each time.
 
-The same folder contains `player.log`, which the tool can monitor in real time to track NPC vendor prices, favor changes, and gardening plots. In **Settings** → **Player Log**, click **📂 Watch player.log** and select the `player.log` file inside the same `Reports` folder.
+The tool can also monitor `player.log` in real time to track NPC vendor prices, favor changes, and gardening plots. This file is located one folder up from `Reports`:
+```
+C:\Users\<you>\AppData\LocalLow\Elder Game\Project Gorgon\player.log
+```
+In **Settings** → **Player Log**, click **📂 Watch player.log** and select that file.
 
 ### 5. Sync game data
 
