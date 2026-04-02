@@ -24,7 +24,7 @@ PORT = 3000
 SURVEY_SCRIPT = Path(__file__).parent / "Survey" / "main.pyw"
 SURVEY_WS_PORT = 8765
 VERSION_FILE = Path(__file__).parent / "version.json"
-VERSION_URL = "https://raw.githubusercontent.com/Streak5274/GorgonHelper/master/version.json"
+VERSION_URL = "https://raw.githubusercontent.com/Goozify/GorgonHelper/master/version.json"
 
 
 def _survey_already_running() -> bool:

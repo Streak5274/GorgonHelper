@@ -42,7 +42,7 @@ WS_HOST = "localhost"
 WS_PORT = 8765
 HTTP_PORT = 3000
 _HTTP_ROOT = Path(__file__).parent.parent  # Reports root
-_VERSION_URL = "https://raw.githubusercontent.com/Streak5274/GorgonHelper/master/version.json"
+_VERSION_URL = "https://raw.githubusercontent.com/Goozify/GorgonHelper/master/version.json"
 
 
 # ---------------------------------------------------------------------------

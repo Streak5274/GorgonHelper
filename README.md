@@ -19,7 +19,7 @@ Tracks your storage vaults, work orders, recipes, favors, quests, and more — a
 Clone the repository or download it as a ZIP and extract it anywhere you like:
 
 ```
-git clone https://github.com/Streak5274/GorgonHelper.git
+git clone https://github.com/Goozify/GorgonHelper.git
 ```
 
 ### 2. Start the server
