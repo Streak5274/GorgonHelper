@@ -4955,7 +4955,9 @@ function processCDNData(key, raw) {
       if (!internal) continue;
       const ings = (v.Ingredients||[]).filter(i=>i.ItemCode).map(i=>[i.ItemCode,i.StackSize]);
       const results = (v.ResultItems||[]).filter(r=>r.ItemCode).map(r=>[r.ItemCode,r.StackSize]);
-      out[internal] = [v.Name||'', v.Skill||'', ings, results];
+      const cookKwRaw = (v.Keywords||[]).find(k=>['MealRecipe','SnackRecipe','InstantSnackRecipe'].includes(k)) || '';
+      const cookKw = cookKwRaw === 'MealRecipe' ? 'Meal' : cookKwRaw ? 'Snack' : '';
+      out[internal] = [v.Name||'', v.Skill||'', ings, results, v.SkillLevelReq||0, cookKw];
     }
     return out;
   }
