@@ -37,6 +37,8 @@ GorgonHelper serving on http://localhost:3000
 
 > Leave this terminal open while using the tool.
 
+**Alternative — no server needed:** You can also open `GorgonHelper.html` directly in Chrome or Edge (double-click the file). Folder watching and live updates still work. The server is only needed for the in-app update feature.
+
 ### 3. Open in Chrome or Edge
 
 Navigate to **http://localhost:3000/GorgonHelper.html** in Chrome or Edge.
@@ -51,11 +53,15 @@ C:\Users\<you>\AppData\LocalLow\Elder Game\Project Gorgon\Reports\
 In the tool, go to **Settings** → click **📂 Watch Folder** → select that `Reports` folder.
 The tool will automatically load your character files and keep them up to date.
 
+The same folder contains `player.log`, which the tool can monitor in real time to track NPC vendor prices, favor changes, and gardening plots. In **Settings** → **Player Log**, click **📂 Watch player.log** and select the `player.log` file inside the same `Reports` folder.
+
 ### 5. Sync game data
 
 Still in **Settings**, under **Game Data Files**, click **Sync All** to download the latest item, recipe, and NPC data from the Project Gorgon CDN.
 
 > This only needs to be done once, and again after game updates.
+
+You can also download item icons in **Settings** → **Icons** → click **Download All Icons**. This grabs icon images from the CDN and saves them to an `icons/` folder inside your watched folder. Icons are optional but improve the display in several tabs.
 
 ---
 
@@ -63,10 +69,11 @@ Still in **Settings**, under **Game Data Files**, click **Sync All** to download
 
 The tool reads `.json` files exported by the game itself.
 
-In-game, open the **Social** window → **Status** tab → click **Export to file**.
-This writes a `Character_<name>.json` file to your `Reports` folder.
+In-game, open **Settings** → **V.I.P.** → **Special Reports**, then use:
+- **Export Storage as JSON** — exports your vault and inventory contents
+- **Export Character as JSON** — exports your character's skills, favor levels, and active quests
 
-The tool picks up new exports automatically as long as the folder is being watched.
+Both files are written to your `Reports` folder and picked up automatically as long as the folder is being watched. Re-export whenever you want to refresh the data.
 
 ---
 
