@@ -219,26 +219,63 @@ class MainWindow(QMainWindow):
 
             self.map_overlay._setup_active = False
 
-            # Assign circle pin pixel positions directly to locations by index.
-            # During setup, pins and locations are added in the same order.
+            # Assign circle pin pixel positions to locations by coordinate proximity.
+            # First do a rough index-based pass to get enough pixel<->meter data
+            # for calibration, then re-match all pins by nearest game coordinate.
+            # This tolerates missed OCR detections — a skipped pin no longer shifts
+            # every subsequent assignment off by one.
             all_locs = self.store.get_all(self.config.active_area)
             pins = self.map_overlay._circle_pins
-            matched = 0
+
+            # --- Pass 1: index-based seed for calibration ---
             for i, loc in enumerate(all_locs):
                 if i < len(pins):
                     loc.pixel_x = float(pins[i][0])
                     loc.pixel_y = float(pins[i][1])
-                    matched += 1
+
+            # --- Calibrate pixel<->meter using seed positions ---
+            self.map_overlay.calibrate(all_locs)
+
+            # --- Pass 2: coordinate-based re-match if calibration succeeded ---
+            cal = self.map_overlay
+            if cal._cal_scale > 0 and len(pins) > 0:
+                unmatched_locs = list(all_locs)
+                for px, py, _t in pins:
+                    # Convert pin pixel → game coords
+                    east_pin  = (px - cal._cal_offset_x) / cal._cal_scale
+                    south_pin = (py - cal._cal_offset_y) / cal._cal_scale
+                    # Find nearest unmatched location
+                    best_loc, best_dist = None, float("inf")
+                    for loc in unmatched_locs:
+                        if loc.east_absolute is None:
+                            continue
+                        d = ((loc.east_absolute - east_pin) ** 2 +
+                             (loc.south_absolute - south_pin) ** 2) ** 0.5
+                        if d < best_dist:
+                            best_dist, best_loc = d, loc
+                    # Accept match within 80 m (generous to handle map distortion)
+                    if best_loc and best_dist < 80:
+                        best_loc.pixel_x = float(px)
+                        best_loc.pixel_y = float(py)
+                        unmatched_locs.remove(best_loc)
+                # Clear pixel positions for locations that got no pin match
+                for loc in unmatched_locs:
+                    loc.pixel_x = None
+                    loc.pixel_y = None
+
+            matched = sum(1 for l in all_locs if l.pixel_x is not None)
             self.store.save()
 
-            # Calibrate pixel<->meter for player position tracking
+            # Re-calibrate with the corrected pixel positions
             self.map_overlay.calibrate(all_locs)
             self._calculate_route()
             self.map_overlay.update()
 
             mo = self.map_overlay
+            unmatched = len(all_locs) - matched
+            warn = f" ⚠ {unmatched} unmatched (OCR missed)" if unmatched else ""
             self.status_bar.showMessage(
-                f"{len(all_locs)} surveys, {len(pins)} pins | "
+                f"{len(all_locs)} surveys, {len(pins)} pins, {matched} matched{warn} | "
                 f"ticks={mo._debug_tick} arrows={mo._debug_arrow_ok} "
                 f"circles_checked={mo._debug_circle_checks} "
                 f"err={mo._debug_last_error}"
