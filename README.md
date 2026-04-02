@@ -39,7 +39,7 @@ GorgonHelper serving on http://localhost:3000
 
 ### 3. Open in Chrome or Edge
 
-Navigate to **http://localhost:3000** in Chrome or Edge.
+Navigate to **http://localhost:3000/GorgonHelper.html** in Chrome or Edge.
 
 ### 4. Watch your Reports folder
 
