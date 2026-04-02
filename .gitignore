@@ -34,3 +34,6 @@ Maps/marked/
 Maps/calibrate_maps.py
 Maps/calibration_from_wiki.json
 Maps/map_calibration.json
+
+# Screenshots — add new ones explicitly with: git add -f screenshots/<filename>
+screenshots/

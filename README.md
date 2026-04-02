@@ -108,6 +108,14 @@ For best results:
 - **In-game map** — open **Filters** and hide all other markers so only the survey pins are visible. Make sure the map is fully visible within the game window.
 - **Map player indicator** — in **Settings → GUI → Other Window Settings**, set **Map Player Indicator Style** to **Square**. This gives the most reliable player position recognition.
 
+**Setup screen** — inventory bag highlighted on the left, map with the red detection circle on the right:
+
+![Survey setup](screenshots/survey-setup.png)
+
+**Active route** — numbered survey locations with the optimised route overlay on the map:
+
+![Survey route overlay](screenshots/survey-route-overlay.png)
+
 ---
 
 ## Updating
