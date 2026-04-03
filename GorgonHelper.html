@@ -3463,11 +3463,12 @@ function buildRecipeRows(displayList, allRecipeKeys) {
     const expanded = expandedRecipes.has(k);
     const safeK = k.replace(/'/g, "\\'");
 
-    // Icon from first result item
+    // Icon: prefer first result item, fall back to recipe's own IconId
     let recipeIconHtml = '';
-    if (resultItems?.length) {
-      const [firstResultId] = resultItems[0];
-      const iconId = ITEMS_ICONS[String(firstResultId)];
+    {
+      let iconId = null;
+      if (resultItems?.length) iconId = ITEMS_ICONS[String(resultItems[0][0])] || null;
+      if (!iconId && r[6]) iconId = r[6];
       const iconUrl = iconId ? getIconUrl(iconId) : null;
       if (iconUrl) recipeIconHtml = `<img class="recipe-icon" src="${iconUrl}" alt="">`;
     }
@@ -5004,7 +5005,7 @@ function processCDNData(key, raw) {
       const results = (v.ResultItems||[]).filter(r=>r.ItemCode).map(r=>[r.ItemCode,r.StackSize]);
       const cookKwRaw = (v.Keywords||[]).find(k=>['MealRecipe','SnackRecipe','InstantSnackRecipe'].includes(k)) || '';
       const cookKw = cookKwRaw === 'MealRecipe' ? 'Meal' : cookKwRaw ? 'Snack' : '';
-      out[internal] = [v.Name||'', v.Skill||'', ings, results, v.SkillLevelReq||0, cookKw];
+      out[internal] = [v.Name||'', v.Skill||'', ings, results, v.SkillLevelReq||0, cookKw, v.IconId||0];
     }
     return out;
   }
