@@ -522,6 +522,7 @@ let RECIPE_RID_MAP = {};  // numeric rid -> internalName (built from CDN recipes
 let ITEMUSES = {};        // id -> [recipeInternalName, ...]
 let SOURCES_RECIPES = {}; // internalName -> [{t, npc?, npcName?, area?, skill?, item?}]
 let NPC_TRAINING = {};   // npcKey -> [{name, favor, cost, skillLevel, recipeKey}]
+let NPC_RECIPES_MAP = {}; // npcKey -> [recipeInternalName, ...] (built from SOURCES_RECIPES)
 let SOURCES_ITEMS = {};   // typeId -> [{t, n?, a?}]
 let NPCS = {};            // npcKey -> {name, area, areaName, desc, services, pos?:{x,z}}
 let VAULTS = {};          // vaultKey -> {name, area, numSlots, levels, grouping, reqDesc}
@@ -906,7 +907,19 @@ function applyGameData(key, data) {
   }
   if (key === 'recipes')         { RECIPES = data; dataLoaded.recipes = true; buildRecipeCaches(); }
   if (key === 'itemuses')        { ITEMUSES = data; dataLoaded.itemuses = true; }
-  if (key === 'sources_recipes') { SOURCES_RECIPES = data; dataLoaded.sources_recipes = true; }
+  if (key === 'sources_recipes') {
+    SOURCES_RECIPES = data; dataLoaded.sources_recipes = true;
+    // Build inverted map: npcKey -> [recipeInternalName, ...]
+    NPC_RECIPES_MAP = {};
+    for (const [recipeKey, entries] of Object.entries(data)) {
+      for (const e of entries) {
+        if (e.t === 'Training' && e.npc) {
+          if (!NPC_RECIPES_MAP[e.npc]) NPC_RECIPES_MAP[e.npc] = [];
+          NPC_RECIPES_MAP[e.npc].push(recipeKey);
+        }
+      }
+    }
+  }
   if (key === 'sources_items')   { SOURCES_ITEMS = data;   dataLoaded.sources_items = true; }
   if (key === 'npcs')            { NPCS = data; dataLoaded.npcs = true; }
   if (key === 'vaults')          { VAULTS = data; dataLoaded.vaults = true; }
@@ -2302,7 +2315,16 @@ function toggleFavorNpc(key) {
 let _lastFavorRows = null; // stored builder fn for partial re-renders
 
 function buildFavorTrainingPanel(npcKey, chars) {
-  const entries = NPC_TRAINING[npcKey];
+  let entries;
+  if (dataLoaded.npc_training && NPC_TRAINING[npcKey]?.length > 0) {
+    entries = NPC_TRAINING[npcKey];
+  } else if (dataLoaded.sources_recipes && NPC_RECIPES_MAP[npcKey]?.length > 0) {
+    // Build entries from CDN data — no per-recipe favor/cost available
+    entries = NPC_RECIPES_MAP[npcKey].map(recipeKey => {
+      const r = RECIPES[recipeKey];
+      return { recipeKey, name: r ? r[0] : recipeKey, skillLevel: r ? (r[4] || 0) : 0, favor: null, cost: null };
+    });
+  }
   if (!entries || entries.length === 0) return '';
 
   // Get recipe completions across all chars: recipeKey -> Set of charIds that know it
@@ -2348,13 +2370,16 @@ function buildFavorTrainingPanel(npcKey, chars) {
       }
 
       const kwTag = e.recipeKey && RECIPES[e.recipeKey] ? cookingKwTag(RECIPES[e.recipeKey]) : '';
+      const favorBadge = e.favor != null
+        ? `<span style="font-size:10px;margin-left:8px;padding:1px 6px;border-radius:3px;background:${fc.bg};color:${fc.text};border:1px solid ${fc.border};white-space:nowrap">${favorLabel}</span>`
+        : '';
       html += `<div style="display:flex;align-items:center;gap:0;padding:1px 0">
         ${learnedHtml}
         <span style="font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.name}</span>${kwTag}
         <span style="flex:1"></span>
         ${lvlStr}
         ${costStr}
-        <span style="font-size:10px;margin-left:8px;padding:1px 6px;border-radius:3px;background:${fc.bg};color:${fc.text};border:1px solid ${fc.border};white-space:nowrap">${favorLabel}</span>
+        ${favorBadge}
       </div>`;
     }
     html += `</div>`;
@@ -2957,7 +2982,8 @@ function renderFavorsTab() {
         : `<td class="favor-bar-cell">${renderFavorCell(Object.values(npc.chars)[0] || 'Neutral', singleCharName && playerLogData[singleCharName]?.npcs[npc.key]?.exactFavor)}</td>`;
 
     const safeKey = npc.key.replace(/'/g,"\\'");
-    const hasTraining = dataLoaded.npc_training && NPC_TRAINING[npc.key]?.length > 0;
+    const hasTraining = (dataLoaded.npc_training && NPC_TRAINING[npc.key]?.length > 0)
+                     || (dataLoaded.sources_recipes && NPC_RECIPES_MAP[npc.key]?.length > 0);
     const hasVendorData = isAll
       ? charList.some(c => playerLogData[c.charData?.Character]?.npcs[npc.key])
       : !!(singleCharName && playerLogData[singleCharName]?.npcs[npc.key]);
