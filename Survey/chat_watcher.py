@@ -138,7 +138,10 @@ class ChatWatcher(QThread):
         m = ADDED_RE.search(line)
         if m:
             name = m.group(1)
-            # Only emit survey_completed — "added to inventory" covers survey map
-            # consumption but also every random pickup (foraging, bags, etc.),
-            # so we deliberately do NOT emit loot_received here.
+            qty  = int(m.group(2)) if m.group(2) else 1
             self.survey_completed.emit(name)
+            # Also emit loot_received so the server can buffer it.  Survey loot
+            # arrives as "added to inventory" lines that appear at the same
+            # moment as the "collected!" summary; the server uses a backward
+            # time window to attribute only those items to the current survey.
+            self.loot_received.emit(name, qty)

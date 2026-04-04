@@ -192,7 +192,7 @@ class SurveyServer:
         # Session stats (route mode)
         self._session_start_time: Optional[float] = None  # time.monotonic() at first visit
         self._session_loot: dict = {}   # display_name -> total quantity collected
-        self._loot_window_end: float = 0.0  # only accept loot before this monotonic time
+        self._loot_buffer: list = []    # [(monotonic_time, name, qty)] buffered "added to inventory" events
         self._last_arrow_px: Optional[int] = None
         self._last_arrow_py: Optional[int] = None
 
@@ -569,6 +569,7 @@ class SurveyServer:
         # Reset session stats for the new route run
         self._session_start_time = None
         self._session_loot = {}
+        self._loot_buffer = []
 
         await self._calculate_route()
         self.map_overlay.update()
@@ -696,12 +697,16 @@ class SurveyServer:
         await self._mark_location_visited(loc)
 
     def _on_loot_received(self, item_name: str, qty: int):
-        """Accumulate loot during route mode for the completion summary."""
+        """Buffer loot events during route mode.  Survey loot is drained into
+        _session_loot when _mark_location_visited fires (i.e. when the
+        'X collected!' summary line appears, which always comes *after* the
+        corresponding 'X added to inventory.' lines in the chat log)."""
         if not self._setup_complete:
             return  # only track during route mode
-        if time.monotonic() > self._loot_window_end:
-            return  # outside loot window — random pickup, not from a survey spot
-        self._session_loot[item_name] = self._session_loot.get(item_name, 0) + qty
+        now = time.monotonic()
+        self._loot_buffer.append((now, item_name, qty))
+        # Prune entries older than 10 seconds to keep the buffer small
+        self._loot_buffer = [(t, n, q) for t, n, q in self._loot_buffer if now - t < 10.0]
 
     async def _on_area_detected(self, area: str):
         self.config.active_area = area
@@ -783,8 +788,21 @@ class SurveyServer:
         # Start session timer on the first visit
         if self._session_start_time is None:
             self._session_start_time = time.monotonic()
-        # Open a loot window — items collected in the next 12 s are from this survey spot
-        self._loot_window_end = time.monotonic() + 12.0
+
+        # Drain loot buffer: survey loot arrives as "X added to inventory." lines
+        # that appear at the SAME moment as (or just before) the "X collected!"
+        # summary that triggered this call.  Grab everything buffered in the
+        # last 5 seconds — that window safely captures the current survey's
+        # drops while excluding items picked up between the previous survey
+        # and the one before that.
+        now = time.monotonic()
+        cutoff = now - 5.0
+        consumed, remaining = [], []
+        for entry in self._loot_buffer:
+            (consumed if entry[0] >= cutoff else remaining).append(entry)
+        self._loot_buffer = remaining
+        for _, name, qty in consumed:
+            self._session_loot[name] = self._session_loot.get(name, 0) + qty
 
         self._rebuild_slot_labels()
 
