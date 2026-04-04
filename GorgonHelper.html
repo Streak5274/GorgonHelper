@@ -5673,11 +5673,27 @@ function renderGardeningTab(targetEl) {
     return;
   }
 
-  // Top bar: session status + button
+  // Pre-compute toolbar action buttons (Reset / Clear harvested) for all chars
+  const toolbarActions = chars.map(charName => {
+    const plots = gardenData[charName].plots;
+    const hasHarvested = Object.values(plots).some(p => p.stage === 'harvested');
+    const safe = charName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const label = chars.length > 1 ? ` (${charName})` : '';
+    return [
+      hasHarvested ? `<button class="sync-btn" onclick="clearHarvestedPlots('${safe}')">✕ Clear harvested${label}</button>` : '',
+      `<button class="sync-btn danger" onclick="if(confirm('Clear all garden data for ${charName}?')) clearAllGardenData('${safe}')" title="Remove all plot data">✕ Reset${label}</button>`,
+    ].filter(Boolean).join('');
+  }).join('');
+
+  // Top bar: session status + buttons
   const statusDot = gardenSessionActive
     ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#4caf50;margin-right:5px;box-shadow:0 0 5px #4caf5088"></span><span style="color:#4caf50;font-size:11px">Monitoring</span>`
     : `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#666;margin-right:5px"></span><span style="color:var(--text-dim);font-size:11px">Stopped</span>`;
-  let html = `<div style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap">${sessionBtn}<span style="flex:1"></span>${statusDot}</div>`;
+  let html = `<div style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap">
+    ${sessionBtn}
+    ${toolbarActions ? `<span class="filter-divider"></span>${toolbarActions}` : ''}
+    <span style="flex:1"></span>${statusDot}
+  </div>`;
 
   if (chars.length === 0) {
     html += `<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:13px">No plots detected yet. Plant seeds in-game to see them here.</div>`;
@@ -5705,7 +5721,6 @@ function renderGardeningTab(targetEl) {
         ${needsCnt > 0 ? `<span style="background:#5b9bd520;color:#5b9bd5;border:1px solid #5b9bd555;border-radius:10px;padding:1px 8px;font-size:11px;font-family:sans-serif">⚠ ${needsCnt} need attention</span>` : ''}
         <span style="flex:1"></span>
         ${ripeCnt > 0 ? `<button class="sync-btn" onclick="markAllHarvested('${safeCharHeader}')" title="Mark all plots as harvested">✓ Harvest All</button>` : ''}
-        <button class="sync-btn danger" onclick="if(confirm('Clear all garden data for ${charName}?')) clearAllGardenData('${safeCharHeader}')" title="Remove all plot data for this character">✕ Reset</button>
       </div>`;
 
     // ── Capacity section ─────────────────────────────────────
@@ -5803,9 +5818,8 @@ function renderGardeningTab(targetEl) {
     html += `</div>`;
 
     if (harvestedPlots.length > 0) {
-      html += `<div style="padding:2px 12px 8px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border)">
+      html += `<div style="padding:2px 12px 8px;border-top:1px solid var(--border)">
         <span style="font-size:11px;color:var(--text-dim)">✅ ${harvestedPlots.length} harvested</span>
-        <button class="sync-btn" onclick="clearHarvestedPlots('${charName.replace(/'/g,"\\'")}')">✕ Clear harvested</button>
       </div>`;
     }
 
