@@ -189,6 +189,9 @@ class SurveyServer:
         # still mark the survey as visited.
         self._grace_loc: Optional[SurveyLocation] = None
         self._grace_time: float = 0.0   # time.monotonic() when grace started
+        # Session stats (route mode)
+        self._session_start_time: Optional[float] = None  # time.monotonic() at first visit
+        self._session_loot: dict = {}   # display_name -> total quantity collected
         self._last_arrow_px: Optional[int] = None
         self._last_arrow_py: Optional[int] = None
 
@@ -483,6 +486,9 @@ class SurveyServer:
         self.chat_watcher.survey_completed.connect(
             lambda name: asyncio.ensure_future(self._on_survey_completed(name))
         )
+        self.chat_watcher.loot_received.connect(
+            lambda name, qty: self._on_loot_received(name, qty)
+        )
         self.chat_watcher.area_changed.connect(
             lambda area: asyncio.ensure_future(self._on_area_detected(area))
         )
@@ -558,6 +564,10 @@ class SurveyServer:
             "type": "setup_stopped",
             "locations": [_loc_to_dict(l) for l in all_locs],
         })
+
+        # Reset session stats for the new route run
+        self._session_start_time = None
+        self._session_loot = {}
 
         await self._calculate_route()
         self.map_overlay.update()
@@ -684,6 +694,12 @@ class SurveyServer:
 
         await self._mark_location_visited(loc)
 
+    def _on_loot_received(self, item_name: str, qty: int):
+        """Accumulate loot during route mode for the completion summary."""
+        if not self._setup_complete:
+            return  # only track during route mode
+        self._session_loot[item_name] = self._session_loot.get(item_name, 0) + qty
+
     async def _on_area_detected(self, area: str):
         self.config.active_area = area
         await self.broadcast({
@@ -761,6 +777,10 @@ class SurveyServer:
                 if ul.inventory_slot is not None and ul.inventory_slot > consumed_slot:
                     self.store.update_slot(ul.id, ul.inventory_slot - 1)
 
+        # Start session timer on the first visit
+        if self._session_start_time is None:
+            self._session_start_time = time.monotonic()
+
         self._rebuild_slot_labels()
 
         all_locs = self.store.get_all(self.config.active_area)
@@ -769,6 +789,7 @@ class SurveyServer:
         remaining = len(self.store.get_unvisited(self.config.active_area))
         if remaining == 0:
             self.inv_overlay.set_overlay_visible(False)
+            self.map_overlay.set_visible(False)
 
         slot_labels_str = {str(k): v for k, v in self._current_slot_labels.items()}
         await self.broadcast({
@@ -779,6 +800,16 @@ class SurveyServer:
             "remaining": remaining,
             "status": f"Visited: {loc.item_name} — {remaining} remaining" if remaining else "All survey locations visited!",
         })
+
+        if remaining == 0:
+            elapsed = int(time.monotonic() - self._session_start_time) if self._session_start_time else 0
+            total = len(all_locs)
+            await self.broadcast({
+                "type": "survey_all_complete",
+                "total": total,
+                "elapsed_seconds": elapsed,
+                "loot": self._session_loot,
+            })
 
     async def _unmark_location_visited(self, loc: SurveyLocation):
         restored_slot = loc.inventory_slot

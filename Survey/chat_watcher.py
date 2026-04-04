@@ -18,10 +18,10 @@ FULL_COORD_RE = re.compile(
 AREA_RE = re.compile(r"\*+ Entering Area: (.+)")
 
 # Survey loot: "[Status] X collected!" or "X x3 collected!" etc.
-COLLECTED_RE = re.compile(r"\[Status\] (.+?)(?:\s+x\d+)? collected!")
+COLLECTED_RE = re.compile(r"\[Status\] (.+?)(?:\s+x(\d+))? collected!")
 
 # Item added to inventory: "[Status] X added to inventory." or "X x2 added to inventory."
-ADDED_RE = re.compile(r"\[Status\] (.+?)(?:\s+x\d+)? added to inventory\.")
+ADDED_RE = re.compile(r"\[Status\] (.+?)(?:\s+x(\d+))? added to inventory\.")
 
 
 def find_newest_log(log_dir: str) -> str | None:
@@ -67,10 +67,11 @@ class ChatWatcher(QThread):
         that old entries are ignored.  Set False only for debugging.
     """
 
-    survey_detected = pyqtSignal(str, int, int)   # item_name, east, south
-    survey_completed = pyqtSignal(str)             # item_name → loot collected
-    area_changed    = pyqtSignal(str)              # area_name
-    error_occurred  = pyqtSignal(str)              # error message
+    survey_detected  = pyqtSignal(str, int, int)   # item_name, east, south
+    survey_completed = pyqtSignal(str)             # item_name → survey map collected
+    loot_received    = pyqtSignal(str, int)        # item_name, quantity → any item collected
+    area_changed     = pyqtSignal(str)             # area_name
+    error_occurred   = pyqtSignal(str)             # error message
 
     def __init__(self, log_dir: str, skip_existing: bool = True, parent=None):
         super().__init__(parent)
@@ -128,9 +129,15 @@ class ChatWatcher(QThread):
 
         m = COLLECTED_RE.search(line)
         if m:
-            self.survey_completed.emit(m.group(1))
+            name = m.group(1)
+            qty  = int(m.group(2)) if m.group(2) else 1
+            self.survey_completed.emit(name)
+            self.loot_received.emit(name, qty)
             return
 
         m = ADDED_RE.search(line)
         if m:
-            self.survey_completed.emit(m.group(1))
+            name = m.group(1)
+            qty  = int(m.group(2)) if m.group(2) else 1
+            self.survey_completed.emit(name)
+            self.loot_received.emit(name, qty)

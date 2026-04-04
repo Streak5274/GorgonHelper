@@ -512,6 +512,7 @@ let surveyStatus = '';
 let surveyConfig = {};
 let surveyPlayerMeters = null;
 let surveyCirclePins = [];
+let surveyCompletion = null; // {total, elapsed_seconds, loot} — set on survey_all_complete
 
 // Game data (loaded from files)
 const APP_VERSION = '0.1.12';
@@ -5932,6 +5933,10 @@ function surveyHandleMessage(msg) {
       surveyStatus = msg.status || '';
       if (mainTab === 'tools' && toolsSubTab === 'survey') { surveyRenderList(); surveyDrawCanvas(); surveyUpdateStatus(); }
       break;
+    case 'survey_all_complete':
+      surveyCompletion = { total: msg.total, elapsed: msg.elapsed_seconds, loot: msg.loot || {} };
+      if (mainTab === 'tools' && toolsSubTab === 'survey') renderToolsTab();
+      break;
     case 'area_changed':
       surveyActiveArea = msg.area;
       surveyStatus = msg.status || '';
@@ -6228,6 +6233,49 @@ function renderSurveyTab(targetEl) {
       <li>In <strong style="color:var(--text)">Settings → GUI → Other Window Settings</strong>, set <strong style="color:var(--text)">Map Player Indicator Style: Square</strong> for the most reliable position recognition.</li>
     </ul>
   </div>
+</div>`;
+    return;
+  }
+
+  // Completion screen — shown after all surveys are done
+  if (surveyCompletion) {
+    const c = surveyCompletion;
+    const mins = Math.floor(c.elapsed / 60);
+    const secs = String(c.elapsed % 60).padStart(2, '0');
+    const lootEntries = Object.entries(c.loot).sort((a,b) => b[1]-a[1]);
+    const lootHtml = lootEntries.map(([name, qty]) => {
+      const tid = ITEMS_BY_NAME[name.toLowerCase().replace(/^the |^a |^an /,'')];
+      const iconId = tid ? ITEMS_ICONS[String(tid)] : null;
+      const iconUrl = iconId ? getIconUrl(iconId) : null;
+      const iconHtml = iconUrl
+        ? `<img src="${iconUrl}" style="width:28px;height:28px;image-rendering:pixelated;flex-shrink:0" alt="">`
+        : `<div style="width:28px;height:28px;background:var(--bg3);border-radius:4px;flex-shrink:0"></div>`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px">
+        ${iconHtml}
+        <span style="font-size:12px;color:var(--text);flex:1">${name}</span>
+        <span style="font-size:13px;font-weight:bold;color:var(--gold)">×${qty}</span>
+      </div>`;
+    }).join('');
+    el.innerHTML = `
+<div style="max-width:560px;margin:40px auto;padding:0 20px;text-align:center">
+  <div style="font-size:52px;margin-bottom:8px">⬡</div>
+  <div style="font-family:'Cinzel',serif;font-size:22px;color:var(--gold);margin-bottom:20px">Survey Complete!</div>
+  <div style="display:flex;justify-content:center;gap:32px;margin-bottom:28px">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 28px">
+      <div style="font-size:32px;font-weight:bold;color:var(--gold);font-family:'Cinzel',serif">${c.total}</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:2px">maps surveyed</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 28px">
+      <div style="font-size:32px;font-weight:bold;color:var(--gold);font-family:'Cinzel',serif">${mins}:${secs}</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:2px">time</div>
+    </div>
+  </div>
+  ${lootEntries.length ? `
+  <div style="font-family:'Cinzel',serif;font-size:12px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;text-align:left">Items Collected</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:24px;text-align:left">${lootHtml}</div>
+  ` : ''}
+  <button class="sync-btn" onclick="surveyCompletion=null;renderToolsTab()" style="margin-right:8px">← Back to Survey</button>
+  <button class="sync-btn" onclick="surveySend({type:'cmd_clear_area'});surveyCompletion=null;renderToolsTab()" style="background:var(--gold-dim);border-color:var(--gold);color:var(--gold)">✕ Clear & Start New</button>
 </div>`;
     return;
   }
