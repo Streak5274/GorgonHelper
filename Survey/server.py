@@ -192,6 +192,7 @@ class SurveyServer:
         # Session stats (route mode)
         self._session_start_time: Optional[float] = None  # time.monotonic() at first visit
         self._session_loot: dict = {}   # display_name -> total quantity collected
+        self._loot_window_end: float = 0.0  # only accept loot before this monotonic time
         self._last_arrow_px: Optional[int] = None
         self._last_arrow_py: Optional[int] = None
 
@@ -698,6 +699,8 @@ class SurveyServer:
         """Accumulate loot during route mode for the completion summary."""
         if not self._setup_complete:
             return  # only track during route mode
+        if time.monotonic() > self._loot_window_end:
+            return  # outside loot window — random pickup, not from a survey spot
         self._session_loot[item_name] = self._session_loot.get(item_name, 0) + qty
 
     async def _on_area_detected(self, area: str):
@@ -780,6 +783,8 @@ class SurveyServer:
         # Start session timer on the first visit
         if self._session_start_time is None:
             self._session_start_time = time.monotonic()
+        # Open a loot window — items collected in the next 12 s are from this survey spot
+        self._loot_window_end = time.monotonic() + 12.0
 
         self._rebuild_slot_labels()
 
