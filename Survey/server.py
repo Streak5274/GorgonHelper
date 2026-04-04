@@ -505,13 +505,51 @@ class SurveyServer:
         self.inv_overlay.set_overlay_visible(False)
         self.map_overlay._setup_active = False
 
-        # Assign detected circle pins to locations by scan order
+        # Assign detected circle pins to locations using two-pass coordinate matching.
+        # Pass 1: index-based seed so calibrate() has enough pixel<->meter data.
+        # Pass 2: re-match each pin to its nearest location by game coordinates —
+        # this tolerates missed OCR detections without shifting every subsequent pin.
         all_locs = self.store.get_all(self.config.active_area)
         pins = self.map_overlay._circle_pins
+
+        # --- Pass 1: index-based seed for calibration ---
         for i, loc in enumerate(all_locs):
             if i < len(pins):
                 loc.pixel_x = float(pins[i][0])
                 loc.pixel_y = float(pins[i][1])
+
+        # --- Calibrate pixel<->meter using seed positions ---
+        self.map_overlay.calibrate(all_locs)
+
+        # --- Pass 2: coordinate-based re-match if calibration succeeded ---
+        cal = self.map_overlay
+        if cal._cal_scale > 0 and len(pins) > 0:
+            unmatched_locs = list(all_locs)
+            for px, py, _t in pins:
+                east_pin  = (px - cal._cal_offset_x) / cal._cal_scale
+                south_pin = (py - cal._cal_offset_y) / cal._cal_scale
+                best_loc, best_dist = None, float("inf")
+                for loc in unmatched_locs:
+                    if loc.east_absolute is None:
+                        continue
+                    d = ((loc.east_absolute - east_pin) ** 2 +
+                         (loc.south_absolute - south_pin) ** 2) ** 0.5
+                    if d < best_dist:
+                        best_dist, best_loc = d, loc
+                if best_loc and best_dist < 80:
+                    best_loc.pixel_x = float(px)
+                    best_loc.pixel_y = float(py)
+                    unmatched_locs.remove(best_loc)
+            for loc in unmatched_locs:
+                loc.pixel_x = None
+                loc.pixel_y = None
+
+        matched = sum(1 for l in all_locs if l.pixel_x is not None)
+        unmatched = len(all_locs) - matched
+        log.info("Pin assignment: %d matched, %d unmatched", matched, unmatched)
+
+        # Re-calibrate with the corrected pixel positions
+        self.map_overlay.calibrate(all_locs)
         self.store.save()
 
         # Always tell the frontend setup ended so the button flips even when
@@ -521,10 +559,9 @@ class SurveyServer:
             "locations": [_loc_to_dict(l) for l in all_locs],
         })
 
-        self.map_overlay.calibrate(all_locs)
         await self._calculate_route()
         self.map_overlay.update()
-        log.info("Setup stopped, route calculated for %d locations", len(all_locs))
+        log.info("Setup stopped, route calculated for %d locations (%d unmatched pins)", len(all_locs), unmatched)
 
     # ------------------------------------------------------------------
     # Chat watcher callbacks  (Qt signals → asyncio via qasync)
