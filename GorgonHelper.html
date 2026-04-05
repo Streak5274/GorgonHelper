@@ -3118,18 +3118,30 @@ function renderFavorsTab() {
   </div>`;
 }
 
+function favorTierFromExact(exactFavor) {
+  // Walk tiers best→worst and return the first whose floor is <= exactFavor
+  for (let i = FAVOR_TIER_ORDER.length - 1; i >= 0; i--) {
+    const tier = FAVOR_TIER_ORDER[i];
+    if (FAVOR_TIER_FLOORS[tier] != null && exactFavor >= FAVOR_TIER_FLOORS[tier]) return tier;
+  }
+  return 'Neutral';
+}
+
 function renderFavorCell(favor, exactFavor) {
-  const fc = FAVOR_COLORS[favor] || FAVOR_COLORS.Neutral;
-  const displayName = favor.replace(/([A-Z])/g,' $1').trim();
+  // If we have a live exact value, derive the true tier from it — the
+  // character-export tier can be stale if favor was gained without re-exporting.
+  const resolvedFavor = exactFavor != null ? favorTierFromExact(exactFavor) : favor;
+  const fc = FAVOR_COLORS[resolvedFavor] || FAVOR_COLORS.Neutral;
+  const displayName = resolvedFavor.replace(/([A-Z])/g,' $1').trim();
   let pct, subHtml = '';
-  if (exactFavor != null && FAVOR_TIER_FLOORS[favor] != null && FAVOR_TIER_CAPS[favor] != null) {
-    const floor = FAVOR_TIER_FLOORS[favor];
-    const cap = FAVOR_TIER_CAPS[favor];
+  if (exactFavor != null && FAVOR_TIER_FLOORS[resolvedFavor] != null && FAVOR_TIER_CAPS[resolvedFavor] != null) {
+    const floor = FAVOR_TIER_FLOORS[resolvedFavor];
+    const cap = FAVOR_TIER_CAPS[resolvedFavor];
     const withinTier = exactFavor - floor;
     pct = Math.min(100, (withinTier / cap) * 100);
     subHtml = `<div style="font-size:10px;color:var(--text-dim);margin-top:2px">${Math.round(withinTier)} / ${cap}</div>`;
   } else {
-    pct = FAVOR_PCT[favor] ?? 0;
+    pct = FAVOR_PCT[resolvedFavor] ?? 0;
   }
   return `<div>
     <div class="favor-bar-row">
