@@ -1039,18 +1039,47 @@ let _recipeKeyByRef = new Map();   // recipe array ref -> internalName
 let _resultNormToRecipe = null;    // normalized result item name -> recipe (built lazily)
 
 let CRAFTABLE_ITEM_IDS = new Set(); // typeIds that are produced by at least one recipe
+let _recipesByResultId = new Map(); // typeId(str) -> [{recipeKey, recipe, producedQty}]
 
 function buildRecipeCaches() {
   _woResolveCache = {};
   _recipeKeyByRef = new Map();
   _resultNormToRecipe = null; // will be built on first use
   CRAFTABLE_ITEM_IDS = new Set();
+  _recipesByResultId = new Map();
   for (const [k, v] of Object.entries(RECIPES)) {
     _recipeKeyByRef.set(v, k);
-    for (const [rid] of (v[3] || [])) {
-      CRAFTABLE_ITEM_IDS.add(String(rid));
+    for (const [rid, qty] of (v[3] || [])) {
+      const tid = String(rid);
+      CRAFTABLE_ITEM_IDS.add(tid);
+      if (!_recipesByResultId.has(tid)) _recipesByResultId.set(tid, []);
+      _recipesByResultId.get(tid).push({ recipeKey: k, recipe: v, producedQty: qty || 1 });
     }
   }
+}
+
+// Returns true if any char in qChars knows a recipe that produces typeId,
+// AND has enough ingredients to craft the shortfall (needQty - haveQty).
+function canCraftItem(typeId, needQty, haveQty, qChars, showAll) {
+  if (!dataLoaded.recipes) return false;
+  const candidates = _recipesByResultId.get(String(typeId));
+  if (!candidates) return false;
+  const needToCraft = needQty - haveQty;
+  const charsToCheck = showAll ? characters : qChars;
+  for (const { recipeKey, recipe, producedQty } of candidates) {
+    // Must know the recipe
+    if (!charsToCheck.some(c => (c.charData.RecipeCompletions || {})[recipeKey] !== undefined)) continue;
+    // Must have enough ingredients for ceil(needToCraft / producedQty) runs
+    const runs = Math.ceil(needToCraft / producedQty);
+    const hasIngs = (recipe[2] || []).every(([ingId, ingQty]) => {
+      const have = showAll
+        ? getInventoryQtyAllChars(ingId)
+        : getInventoryQtyFast(ingId, getCharItemMap(qChars[0]));
+      return have >= ingQty * runs;
+    });
+    if (hasIngs) return true;
+  }
+  return false;
 }
 
 function getResultNormMap() {
@@ -4583,7 +4612,10 @@ function renderQuestsTab() {
   const isReadyWithCrafts = ({ quest, chars: qChars }) => {
     const itemObjs = quest.objs.filter(o => o.tid);
     if (itemObjs.length === 0) return false;
-    return itemObjs.every(o => getHave(o.tid, qChars) >= o.n || (dataLoaded.recipes && CRAFTABLE_ITEM_IDS.has(String(o.tid))));
+    return itemObjs.every(o => {
+      const have = getHave(o.tid, qChars);
+      return have >= o.n || canCraftItem(o.tid, o.n, have, qChars, showAll);
+    });
   };
 
   // Apply filters
