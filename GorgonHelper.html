@@ -1362,7 +1362,7 @@ function renderCharTabs() {
     + `<div class="char-tab add-tab" onclick="pickFolder()" title="Watch folder">＋</div>`;
 }
 
-function setActiveChar(id) { activeCharId = id; activeVaultFilter = null; activeTownFilter = ''; vaultAreaFilter = ''; favorAreaFilter = ''; questLocationFilter = ''; questSearchQ = ''; completedWOSearch = ''; renderAll(); }
+function setActiveChar(id) { activeCharId = id; activeVaultFilter = null; activeTownFilter = ''; vaultAreaFilter = ''; favorAreaFilter = ''; questLocationFilter = ''; questSearchQ = ''; questCompleteFilter = ''; completedWOSearch = ''; renderAll(); }
 function removeChar(id, e) {
   e.stopPropagation();
   if (characters.length===1) { showToast("Can't remove last character"); return; }
@@ -4508,6 +4508,7 @@ function renderVaultsTab() {
 // ═══════════════════════════════════════════════════════════
 let questLocationFilter = '';
 let questSearchQ = '';
+let questCompleteFilter = ''; // '' | 'ready' | 'crafts'
 
 function setQuestLocationFilter(loc) {
   questLocationFilter = questLocationFilter === loc ? '' : loc;
@@ -4522,7 +4523,8 @@ function onQuestSearch(v) {
   }, 10);
 }
 function clearQuestSearch() { questSearchQ = ''; renderQuestsTab(); }
-function navigateToQuest(questName) { questSearchQ = questName; questLocationFilter = ''; setMainTab('quests'); }
+function setQuestCompleteFilter(v) { questCompleteFilter = questCompleteFilter === v ? '' : v; renderQuestsTab(); }
+function navigateToQuest(questName) { questSearchQ = questName; questLocationFilter = ''; questCompleteFilter = ''; setMainTab('quests'); }
 
 function goToRecipe(itemName) {
   recipeSearchQ = itemName;
@@ -4571,11 +4573,26 @@ function renderQuestsTab() {
   }
   const sortedLocs = [...locSet.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
+  // Completability helpers — only considers item objectives (tid)
+  const getHave = (tid, qChars) => showAll ? getInventoryQtyAllChars(tid) : getInventoryQtyFast(tid, getCharItemMap(qChars[0]));
+  const isReady = ({ quest, chars: qChars }) => {
+    const itemObjs = quest.objs.filter(o => o.tid);
+    if (itemObjs.length === 0) return false; // can't verify non-item objectives
+    return itemObjs.every(o => getHave(o.tid, qChars) >= o.n);
+  };
+  const isReadyWithCrafts = ({ quest, chars: qChars }) => {
+    const itemObjs = quest.objs.filter(o => o.tid);
+    if (itemObjs.length === 0) return false;
+    return itemObjs.every(o => getHave(o.tid, qChars) >= o.n || (dataLoaded.recipes && CRAFTABLE_ITEM_IDS.has(String(o.tid))));
+  };
+
   // Apply filters
   const q = questSearchQ.toLowerCase();
   let filtered = questEntries;
   if (questLocationFilter) filtered = filtered.filter(e => (e.quest.loc || 'Unknown') === questLocationFilter);
   if (q) filtered = filtered.filter(e => e.quest.name.toLowerCase().includes(q) || (e.quest.npcName||'').toLowerCase().includes(q));
+  if (questCompleteFilter === 'ready')  filtered = filtered.filter(isReady);
+  if (questCompleteFilter === 'crafts') filtered = filtered.filter(isReadyWithCrafts);
 
   // Sort: quests with items first, then alphabetical
   filtered.sort((a, b) => {
@@ -4697,6 +4714,11 @@ function renderQuestsTab() {
         <span class="search-icon">⌕</span>
       </div>
       <span style="font-size:12px;color:var(--text-dim)"><span style="color:var(--gold)">${filtered.length}</span> active quests</span>
+    </div>
+    <div class="filter-row" style="margin-bottom:8px">
+      <span class="filter-chip ${!questCompleteFilter?'active':''}" onclick="setQuestCompleteFilter('')">All</span>
+      <span class="filter-chip ${questCompleteFilter==='ready'?'active':''}" onclick="setQuestCompleteFilter('ready')" title="Quests where all item objectives are in your inventory">✓ Completeable</span>
+      <span class="filter-chip ${questCompleteFilter==='crafts'?'active':''}" onclick="setQuestCompleteFilter('crafts')" title="Completeable items, plus items you can craft">🔨 With Crafts</span>
     </div>
     <div class="filter-row" style="margin-bottom:14px">
       <span class="filter-chip ${!questLocationFilter?'active':''}" onclick="setQuestLocationFilter('')">All Locations</span>
