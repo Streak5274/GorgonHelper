@@ -538,6 +538,99 @@ let LANDMARKS = {};       // areaName -> [{name, type, desc, x, z}]
 let dataLoaded = { items: false, recipes: false, itemuses: false, sources_recipes: false, sources_items: false, npcs: false, vaults: false, quests: false, landmarks: false, npc_training: false };
 let dataVersions = {}; // key -> version string read from _version field
 
+// ── WebSocket bridge (Firefox / non-FSAPI support) ──────────────────────
+const WS_BRIDGE_PORT = 8765;
+let wsBridge = null;
+let wsBridgeConnected = false;
+let _wsBridgePendingChars = new Map(); // `CharName_Server` → {char, inv}
+let _wsBridgeReconnectTimer = null;
+
+function initWsBridge() { _wsConnect(); }
+
+function _wsConnect() {
+  if (wsBridge && wsBridge.readyState <= WebSocket.OPEN) return;
+  try {
+    wsBridge = new WebSocket(`ws://localhost:${WS_BRIDGE_PORT}`);
+    wsBridge.onopen = () => {
+      wsBridgeConnected = true;
+      _wsBridgePendingChars = new Map();
+      if (_wsBridgeReconnectTimer) { clearTimeout(_wsBridgeReconnectTimer); _wsBridgeReconnectTimer = null; }
+      renderCharTabs();
+      if (mainTab === 'settings') renderSettingsTab();
+    };
+    wsBridge.onmessage = e => { try { _wsHandleMsg(JSON.parse(e.data)); } catch(_) {} };
+    wsBridge.onclose = () => {
+      wsBridgeConnected = false;
+      renderCharTabs();
+      if (mainTab === 'settings') renderSettingsTab();
+      _wsBridgeReconnectTimer = setTimeout(_wsConnect, 10_000);
+    };
+    wsBridge.onerror = () => {}; // onclose handles retry
+  } catch(_) {}
+}
+
+function _wsHandleMsg(msg) {
+  if (msg.type === 'file') {
+    _wsHandleFile(msg.path, msg.content);
+  } else if (msg.type === 'ready') {
+    _wsFlushChars(true);
+    if (characters.length > 0) renderAll();
+  } else if (msg.type === 'playerlog') {
+    const count = parsePlayerLogLines(msg.lines);
+    if (count > 0 && mainTab === 'favors') renderFavorsTab();
+    if (count > 0 && mainTab === 'tools' && toolsSubTab === 'gardening') renderToolsTab();
+  }
+}
+
+function _wsHandleFile(path, content) {
+  // Game data from Json/ subfolder — CDN format, needs processCDNData
+  if (path.startsWith('Json/')) {
+    const filename = path.slice(5);
+    const df = DATA_FILES.find(d => d.file === filename);
+    if (df && !dataLoaded[df.key]) {
+      try { applyGameData(df.key, processCDNData(df.key, JSON.parse(content))); } catch(_) {}
+    }
+    return;
+  }
+  // Character / inventory JSON
+  try {
+    const json = JSON.parse(content);
+    if (!json.Character || !json.ServerName || !json.Report) return;
+    const key = `${json.Character}_${json.ServerName}`;
+    if (!_wsBridgePendingChars.has(key)) _wsBridgePendingChars.set(key, {});
+    const entry = _wsBridgePendingChars.get(key);
+    if (json.Report === 'CharacterSheet') entry.char = json;
+    if (json.Report === 'Storage')        entry.inv  = json;
+    // After 'ready', apply individual updates immediately when both halves arrive
+    if (wsBridgeConnected && entry.char && entry.inv) _wsApplyChar(key, entry, false);
+  } catch(_) {}
+}
+
+function _wsApplyChar(key, pair, isInitial) {
+  if (!pair.char || !pair.inv) return false;
+  const id = `${pair.char.Character}_${pair.char.ServerName}`;
+  const existing = characters.findIndex(c => c.id === id);
+  const charObj = { id, charData: pair.char, invData: pair.inv, items: processInventory(pair.inv), topSkills: getTopSkills(pair.char) };
+  invalidateCharItemMap(id);
+  if (existing >= 0) {
+    characters[existing] = charObj;
+    if (!isInitial) showToast(`↑ ${pair.char.Character} updated`);
+  } else {
+    characters.push(charObj);
+    if (!activeCharId) activeCharId = id;
+    if (!isInitial) showToast(`+ ${pair.char.Character} loaded`);
+  }
+  return true;
+}
+
+function _wsFlushChars(isInitial) {
+  let anyChange = false;
+  for (const [key, pair] of _wsBridgePendingChars)
+    if (_wsApplyChar(key, pair, isInitial)) anyChange = true;
+  if (anyChange && !activeCharId && characters.length > 0) activeCharId = characters[0].id;
+  return anyChange;
+}
+
 // ── Player log data ──
 let playerLogData = {};         // charName → { npcs: {npcKey→{currentGold,maxGold,resetAt,favorLevel,loggedAt}}, idMap: {id→npcKey} }
 let currentLogChar = '';        // character name detected from ProcessAddPlayer
@@ -1380,7 +1473,7 @@ function renderCharTabs() {
   el.innerHTML = characters.map(c => `
     <div class="char-tab ${c.id===activeCharId?'active':''}" onclick="setActiveChar('${c.id}')">
       ${c.charData.Character}
-      ${!playerLogWatchActive ? `<span class="log-warn" title="Player log not connected — favor data may be stale">!</span>` : ''}
+      ${!playerLogWatchActive && !wsBridgeConnected ? `<span class="log-warn" title="Player log not connected — favor data may be stale">!</span>` : ''}
       <span style="font-size:10px;color:var(--text-dim)">${c.charData.ServerName}</span>
       <span class="badge">${c.items.length}</span>
       ${characters.length>1?`<span onclick="removeChar('${c.id}',event)" style="margin-left:1px;color:var(--text-dim);font-size:11px;opacity:.5" title="Remove">✕</span>`:''}
@@ -5064,6 +5157,28 @@ function renderSettingsTab() {
   </div>
 
   <div class="settings-section" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px">
+    <div class="settings-title">🔌 WebSocket Bridge</div>
+    <div class="settings-meta" style="margin-bottom:10px;line-height:1.7">
+      Enables automatic folder watching and live player log in Firefox and other browsers that
+      lack the File System Access API. Run <code style="color:var(--gold)">python ws_bridge.py</code> in the
+      Reports folder (or click <strong>Start Bridge</strong> after running <code style="color:var(--gold)">setup_survey.py</code>).
+    </div>
+    <div class="settings-row">
+      <div>
+        ${wsBridgeConnected
+          ? `<div class="settings-label" style="color:#7ab880">● Connected on port ${WS_BRIDGE_PORT}</div>
+             <div class="settings-meta">File changes and player.log stream automatically</div>`
+          : `<div class="settings-label" style="color:var(--text-dim)">○ Not connected</div>
+             <div class="settings-meta">Bridge not running — connect on port ${WS_BRIDGE_PORT}, retrying every 10s</div>`
+        }
+      </div>
+      ${!wsBridgeConnected
+        ? `<a href="gorgon-bridge://start" class="sync-btn" style="text-decoration:none;display:inline-flex;align-items:center">▶ Start Bridge</a>`
+        : ''}
+    </div>
+  </div>
+
+  <div class="settings-section" style="border-top:1px solid var(--border);margin-top:8px;padding-top:16px">
     <div class="settings-title">Game Data Files</div>
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;line-height:1.7">
       Loaded from <code style="font-size:10px">Json/</code> subfolder in your watched folder.
@@ -6840,6 +6955,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   await loadPinnedNpcs();
   loadPlayerLogData();
   await resumePlayerLogWatch();
+  initWsBridge();
 
   // Restore survey tab visibility preference
   if (localStorage.getItem('showSurveyTab') === '1') setSurveyTabVisible(true, false);
