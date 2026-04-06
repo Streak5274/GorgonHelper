@@ -5104,6 +5104,9 @@ function renderSettingsTab() {
         ${folderHandle
           ? `<div class="settings-label">📁 ${folderHandle.name}</div>
              <div class="settings-meta" id="settingsFolderMeta">Auto-refreshing every ${POLL_INTERVAL/1000}s</div>`
+          : wsBridgeConnected
+          ? `<div class="settings-label" style="color:#7ab880">● Bridge watching Reports folder</div>
+             <div class="settings-meta">Auto-detected from %APPDATA% · Use Select Folder to override with a different location</div>`
           : `<div class="settings-meta">Select the Reports folder to enable automatic character file loading.</div>`
         }
       </div>
@@ -5127,6 +5130,9 @@ function renderSettingsTab() {
                ${currentLogChar ? ` · Player: <strong style="color:var(--text)">${currentLogChar}</strong>` : ''}
                ${playerLogLastUpdate ? ` · Updated ${Math.round((Date.now()-playerLogLastUpdate)/60000)}m ago` : ''}
              </div>`
+          : wsBridgeConnected
+          ? `<div class="settings-label" style="color:#7ab880">● Bridge watching Player.log</div>
+             <div class="settings-meta">Auto-detected from %APPDATA%${currentLogChar ? ` · Player: <strong style="color:var(--text)">${currentLogChar}</strong>` : ''} · Use Watch below to override with a different file</div>`
           : playerLogPendingHandle
           ? `<div class="settings-label" style="color:var(--gold-dim)">⚠ player.log (click to resume)</div>
              <div class="settings-meta">${playerLogPendingHandle.name} · Permission needed after page reload</div>`
