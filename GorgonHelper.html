@@ -280,6 +280,8 @@ body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg);color:var(--te
 .favor-pin-btn:hover{color:var(--gold)}
 .favor-pin-btn.pinned{opacity:1;color:var(--gold)}
 .favor-row:hover .favor-pin-btn{opacity:1}
+.npc-store-tag{font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(80,140,200,0.1);border:1px solid rgba(80,140,200,0.22);color:var(--text-dim);white-space:nowrap;display:inline-block}
+.npc-consign-tag{font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(120,180,100,0.1);border:1px solid rgba(120,180,100,0.22);color:var(--text-dim);white-space:nowrap;display:inline-block}
 .pinned-skill-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(42,47,63,.4)}
 .pinned-skill-row:last-child{border-bottom:none}
 .pinned-skill-name{flex:1;font-size:13px;color:var(--text-bright);font-weight:600}
@@ -3101,6 +3103,43 @@ function buildFavorVendorPanelAllChars(npcKey, charList) {
   </div>`;
 }
 
+// Convert PascalCase item type names to readable spaced words
+// e.g. "CorpseTrophy" → "Corpse Trophy", "AlchemyIngredient" → "Alchemy Ingredient"
+function _formatItemTypeName(t) {
+  return t.replace(/([A-Z])/g, ' $1').trim();
+}
+
+// Return { store: string[], consignment: string[] } of unique item type names for an NPC
+function getNpcServiceItemTypes(npcKey) {
+  const npc = NPCS[npcKey];
+  if (!npc) return { store: [], consignment: [] };
+  const store = new Set(), consignment = new Set();
+  for (const svc of (npc.services || [])) {
+    if (svc.type === 'Store') {
+      for (const cap of svc.capIncreases) {
+        const parts = cap.split(':');
+        if (parts.length >= 3) parts[2].split(',').forEach(t => store.add(t.trim()));
+      }
+    } else if (svc.type === 'Consignment') {
+      for (const t of svc.itemTypes) consignment.add(t.trim());
+    }
+  }
+  return { store: [...store], consignment: [...consignment] };
+}
+
+function buildNpcStorePanel(npcKey) {
+  const { store, consignment } = getNpcServiceItemTypes(npcKey);
+  if (!store.length && !consignment.length) return '';
+  const sectionHeader = (label) =>
+    `<div style="font-family:'Cinzel',serif;font-size:9px;color:var(--gold-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px;padding-bottom:3px;border-bottom:1px solid var(--border)">${label}</div>`;
+  const tagRow = (tags, cls) =>
+    `<div style="display:flex;flex-wrap:wrap;gap:5px">${tags.map(t => `<span class="${cls}">${_formatItemTypeName(t)}</span>`).join('')}</div>`;
+  let html = '';
+  if (store.length) html += `${sectionHeader('Buys &amp; Sells')}${tagRow(store, 'npc-store-tag')}`;
+  if (consignment.length) html += `<div style="margin-top:${store.length ? 10 : 0}px">${sectionHeader('Consignment')}${tagRow(consignment, 'npc-consign-tag')}</div>`;
+  return `<div style="padding:8px 4px 6px">${html}</div>`;
+}
+
 function renderFavorsTab() {
   if (activeCharId === '__favorcalc__') return renderFavorCalcTab();
   const showAll = activeCharId === '__all__';
@@ -3230,12 +3269,15 @@ function renderFavorsTab() {
     const hasVendorData = isAll
       ? charList.some(c => playerLogData[c.charData?.Character]?.npcs[npc.key])
       : !!(singleCharName && playerLogData[singleCharName]?.npcs[npc.key]);
-    const hasExpand = hasTraining || hasVendorData;
+    const { store: _storeTypes, consignment: _consignTypes } = dataLoaded.npcs ? getNpcServiceItemTypes(npc.key) : { store: [], consignment: [] };
+    const hasStoreItems = _storeTypes.length > 0 || _consignTypes.length > 0;
+    const hasExpand = hasTraining || hasVendorData || hasStoreItems;
     const expanded = expandedFavorNpcs.has(npc.key);
     const toggleIcon = hasExpand ? `<span style="font-size:10px;color:var(--text-dim);margin-left:5px">${expanded ? '▲' : '▼'}</span>` : '';
 
     const detailRow = (hasExpand && expanded)
       ? `<tr><td colspan="2" style="padding:0 8px 10px 12px;background:var(--bg2);border-bottom:1px solid var(--border)">
+          ${hasStoreItems ? buildNpcStorePanel(npc.key) : ''}
           ${isAll ? buildFavorVendorPanelAllChars(npc.key, charList) : buildFavorVendorPanel(npc.key, singleCharName)}
           ${hasTraining ? buildFavorTrainingPanel(npc.key, charList) : ''}
         </td></tr>`
@@ -5376,7 +5418,7 @@ function processCDNData(key, raw) {
         areaName: v.AreaName||'',
         desc: v.Desc||'',
         pos,
-        services: (v.Services||[]).map(s=>({type:s.Type,favor:s.Favor,skills:s.Skills||[],unlocks:s.Unlocks||[]})),
+        services: (v.Services||[]).map(s=>({type:s.Type,favor:s.Favor,skills:s.Skills||[],unlocks:s.Unlocks||[],capIncreases:s.CapIncreases||[],itemTypes:s.ItemTypes||[]})),
         prefs
       };
     }
