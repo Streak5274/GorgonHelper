@@ -637,13 +637,18 @@ class SurveyServer:
                 "status": f"Detected: {item_name}  ({east:+d}E, {south:+d}S)  [slot {self._current_scan_slot}]",
             })
         else:
-            # Also wake auto-use on duplicate so it doesn't timeout
+            # Duplicate location — survey was still consumed, so advance the
+            # scan slot exactly as we would for a successful detection.
+            # Without this, _current_scan_slot stays on the same slot and every
+            # subsequent retry also hits the duplicate check, stalling progress.
+            self._current_scan_slot += 1
+            self.inv_overlay.set_current_slot(self._current_scan_slot)
             if self._auto_use_event and not self._auto_use_event.is_set():
                 self._auto_use_event.set()
             await self.broadcast({
                 "type": "survey_duplicate",
                 "east": east, "south": south,
-                "status": f"Duplicate skipped: {east:+d}E, {south:+d}S",
+                "status": f"Duplicate skipped: {east:+d}E, {south:+d}S  [slot {self._current_scan_slot}]",
             })
 
     @staticmethod
