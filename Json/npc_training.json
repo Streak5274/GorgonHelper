@@ -17,7 +17,7 @@
     },
     {
       "name": "Blitz Shot 6",
-      "favor": "?",
+      "favor": "Comfortable",
       "cost": 9750,
       "skillLevel": 51,
       "recipeKey": null
@@ -2280,7 +2280,7 @@
     {
       "name": "Paralyzing Rat Trap",
       "favor": "?",
-      "cost": 20,
+      "cost": 0,
       "skillLevel": 20,
       "recipeKey": "RatTrap1"
     },
@@ -2299,9 +2299,191 @@
       "recipeKey": null
     },
     {
+      "name": "Beginner's Viper Headgear Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 45,
+      "recipeKey": "ShamanicHeadRangedAccuracy1"
+    },
+    {
+      "name": "Novice's Viper Headgear Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 50,
+      "recipeKey": "ShamanicHeadRangedAccuracy2"
+    },
+    {
+      "name": "Shaman's Viper Headgear Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 55,
+      "recipeKey": "ShamanicHeadRangedAccuracy3"
+    },
+    {
+      "name": "Beginner's Viper Core Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 46,
+      "recipeKey": "ShamanicChestBurstAccuracy1"
+    },
+    {
+      "name": "Novice's Viper Core Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 51,
+      "recipeKey": "ShamanicChestBurstAccuracy2"
+    },
+    {
+      "name": "Shaman's Viper Core Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 56,
+      "recipeKey": "ShamanicChestBurstAccuracy3"
+    },
+    {
+      "name": "Beginner's Viper Hands Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 47,
+      "recipeKey": "ShamanicHandsMeleeAccuracy1"
+    },
+    {
+      "name": "Novice's Viper Hands Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 52,
+      "recipeKey": "ShamanicHandsMeleeAccuracy2"
+    },
+    {
+      "name": "Shaman's Viper Hands Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 57,
+      "recipeKey": "ShamanicHandsMeleeAccuracy3"
+    },
+    {
+      "name": "Deep Wolf Headgear Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 54,
+      "recipeKey": "ShamanicHeadArmor4"
+    },
+    {
+      "name": "Deep Bear Chest Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 59,
+      "recipeKey": "ShamanicChestArmor4"
+    },
+    {
+      "name": "Deep Wolf Chest Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 58,
+      "recipeKey": "ShamanicChestPowerRegen4"
+    },
+    {
+      "name": "Deep Tiger Hands Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 60,
+      "recipeKey": "ShamanicHandsArmor4"
+    },
+    {
+      "name": "Deep Deer Necklace Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 51,
+      "recipeKey": "ShamanicNecklaceHealth4"
+    },
+    {
+      "name": "Deep Chest Carapace Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 57,
+      "recipeKey": "ShamanicChestCrushingTraumaMitigation4"
+    },
+    {
+      "name": "Deep Deinonychus Leg Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 61,
+      "recipeKey": "ShamanicLegsArmor4"
+    },
+    {
+      "name": "Deep Boar Foot Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 53,
+      "recipeKey": "ShamanicFeetArmor4"
+    },
+    {
+      "name": "Novice's Treant Leg Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 52,
+      "recipeKey": "ShamanicLegsUnarmedBaseDamage1"
+    },
+    {
+      "name": "Shaman's Treant Leg Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 58,
+      "recipeKey": "ShamanicLegsUnarmedBaseDamage2"
+    },
+    {
+      "name": "Deep Treant Leg Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 65,
+      "recipeKey": "ShamanicLegsUnarmedBaseDamage3"
+    },
+    {
+      "name": "Novice's Fiery Ring Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 49,
+      "recipeKey": "ShamanicRingFireMagicBaseDmg1"
+    },
+    {
+      "name": "Shaman's Fiery Ring Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 56,
+      "recipeKey": "ShamanicRingFireMagicBaseDmg2"
+    },
+    {
+      "name": "Deep Fiery Ring Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 64,
+      "recipeKey": "ShamanicRingFireMagicBaseDmg3"
+    },
+    {
+      "name": "Novice's Treant Necklace Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 50,
+      "recipeKey": "ShamanicNecklaceDruidBaseDmg1"
+    },
+    {
+      "name": "Shaman's Treant Necklace Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 55,
+      "recipeKey": "ShamanicNecklaceDruidBaseDmg2"
+    },
+    {
+      "name": "Deep Treant Necklace Infusion",
+      "favor": "?",
+      "cost": 0,
+      "skillLevel": 60,
+      "recipeKey": "ShamanicNecklaceDruidBaseDmg3"
+    },
+    {
       "name": "Horrifying Screech",
       "favor": "?",
-      "cost": null,
+      "cost": 0,
       "skillLevel": null,
       "recipeKey": null
     }
@@ -2655,11 +2837,60 @@
       "recipeKey": null
     },
     {
+      "name": "Basic Whittling Practice",
+      "favor": "&lt;Close Friends",
+      "cost": 2865,
+      "skillLevel": 32,
+      "recipeKey": "Whittling4"
+    },
+    {
+      "name": "Decent Whittling Practice",
+      "favor": "&lt;Close Friends",
+      "cost": 41,
+      "skillLevel": 41,
+      "recipeKey": "Whittling5"
+    },
+    {
+      "name": "Unlock Whittling Skill Levels 51-60",
+      "favor": "&lt;Best Friends",
+      "cost": 5000,
+      "skillLevel": 50,
+      "recipeKey": null
+    },
+    {
+      "name": "Good Whittling Practice",
+      "favor": "&lt;Best Friends",
+      "cost": 6500,
+      "skillLevel": 51,
+      "recipeKey": "Whittling6"
+    },
+    {
+      "name": "Unlock Whittling Skill Levels 61-70",
+      "favor": "&lt;Best Friends",
+      "cost": 10000,
+      "skillLevel": 60,
+      "recipeKey": null
+    },
+    {
+      "name": "Semi-Expert's Whittling Practice",
+      "favor": "&lt;Best Friends",
+      "cost": 9833,
+      "skillLevel": 61,
+      "recipeKey": "Whittling7"
+    },
+    {
       "name": "Expert's Whittling Practice",
       "favor": "BestFriends",
-      "cost": 71,
+      "cost": 13165,
       "skillLevel": 71,
       "recipeKey": "Whittling8"
+    },
+    {
+      "name": "Semi-Master's Whittling Practice",
+      "favor": "LikeFamily",
+      "cost": 18165,
+      "skillLevel": 81,
+      "recipeKey": "Whittling9"
     },
     {
       "name": "Simple Whittling Knife",
@@ -2678,21 +2909,21 @@
     {
       "name": "Good Whittling Knife",
       "favor": "CloseFriends",
-      "cost": 40,
+      "cost": 3132,
       "skillLevel": 40,
       "recipeKey": "WhittlingKnife3"
     },
     {
       "name": "Expert's Whittling Knife",
       "favor": "BestFriends",
-      "cost": 60,
+      "cost": 7800,
       "skillLevel": 60,
       "recipeKey": "WhittlingKnife4"
     },
     {
       "name": "Master Whittling Knife",
       "favor": "LikeFamily",
-      "cost": 80,
+      "cost": 15133,
       "skillLevel": 80,
       "recipeKey": "WhittlingKnife5"
     }
@@ -3201,6 +3432,12 @@
       "favor": "?",
       "cost": 400000,
       "skillLevel": 70,
+      "itemCosts": [
+        {
+          "qty": 3,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3208,6 +3445,12 @@
       "favor": "?",
       "cost": 17200,
       "skillLevel": null,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3215,6 +3458,12 @@
       "favor": "Friends",
       "cost": 19850,
       "skillLevel": 73,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3222,6 +3471,12 @@
       "favor": "?",
       "cost": 19950,
       "skillLevel": 75,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3229,6 +3484,12 @@
       "favor": "?",
       "cost": 22500,
       "skillLevel": 76,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3236,6 +3497,12 @@
       "favor": "?",
       "cost": 22550,
       "skillLevel": 77,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3243,6 +3510,12 @@
       "favor": "?",
       "cost": 22550,
       "skillLevel": 77,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3250,6 +3523,12 @@
       "favor": "?",
       "cost": 22650,
       "skillLevel": 79,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3257,6 +3536,12 @@
       "favor": "?",
       "cost": 27250,
       "skillLevel": 81,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3264,6 +3549,12 @@
       "favor": "Comfortable",
       "cost": 2700,
       "skillLevel": 30,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3271,6 +3562,12 @@
       "favor": "Friends",
       "cost": 4700,
       "skillLevel": 40,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3278,6 +3575,12 @@
       "favor": "?",
       "cost": 7200,
       "skillLevel": 50,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3285,6 +3588,12 @@
       "favor": "?",
       "cost": 11700,
       "skillLevel": 60,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3292,6 +3601,12 @@
       "favor": "?",
       "cost": 17200,
       "skillLevel": 70,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3299,6 +3614,12 @@
       "favor": "?",
       "cost": 22700,
       "skillLevel": 80,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3306,6 +3627,12 @@
       "favor": "?",
       "cost": 27700,
       "skillLevel": 90,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3313,6 +3640,12 @@
       "favor": "?",
       "cost": 400000,
       "skillLevel": 70,
+      "itemCosts": [
+        {
+          "qty": 3,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3320,6 +3653,12 @@
       "favor": "&lt;=Comfortable",
       "cost": 20000,
       "skillLevel": 50,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3327,6 +3666,12 @@
       "favor": "?",
       "cost": 50000,
       "skillLevel": 60,
+      "itemCosts": [
+        {
+          "qty": 2,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3334,6 +3679,12 @@
       "favor": "?",
       "cost": 200000,
       "skillLevel": 70,
+      "itemCosts": [
+        {
+          "qty": 3,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -3341,6 +3692,12 @@
       "favor": "CloseFriends",
       "cost": 6440,
       "skillLevel": 72,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": "CrelpinsFishDish"
     },
     {
@@ -3348,6 +3705,12 @@
       "favor": "CloseFriends",
       "cost": 4820,
       "skillLevel": 61,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": "CrelpinsFriedDish"
     },
     {
@@ -3355,6 +3718,12 @@
       "favor": "BestFriends",
       "cost": 6920,
       "skillLevel": 75,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": "CrelpinsFruitJuice"
     },
     {
@@ -3362,6 +3731,12 @@
       "favor": "LikeFamily",
       "cost": 6920,
       "skillLevel": 75,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": "CrelpinsCornDish"
     },
     {
@@ -3369,6 +3744,12 @@
       "favor": "LikeFamily",
       "cost": 6920,
       "skillLevel": 75,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": "CrelpinsGorp"
     },
     {
@@ -3376,6 +3757,12 @@
       "favor": "BestFriends",
       "cost": 7080,
       "skillLevel": 76,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": "CrelpinsSideSalad"
     },
     {
@@ -3383,6 +3770,12 @@
       "favor": "LikeFamily",
       "cost": 7760,
       "skillLevel": 80,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": "CrelpinsFruitSalad"
     },
     {
@@ -3390,6 +3783,12 @@
       "favor": "LikeFamily",
       "cost": 8300,
       "skillLevel": 83,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": "CrelpinsTart"
     },
     {
@@ -3397,6 +3796,12 @@
       "favor": "BestFriends",
       "cost": 1340,
       "skillLevel": 27,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": "CrelpinsSushi"
     }
   ],
@@ -3852,6 +4257,13 @@
       "cost": 7800,
       "skillLevel": 60,
       "recipeKey": "SkullPowder3"
+    },
+    {
+      "name": "Unlock Corpse Talking Skill Levels 51-60",
+      "favor": "?",
+      "cost": 20000,
+      "skillLevel": 50,
+      "recipeKey": null
     }
   ],
   "NPC_DentonRazor": [
@@ -4195,6 +4607,12 @@
       "favor": "CloseFriends",
       "cost": 1132,
       "skillLevel": 20,
+      "itemCosts": [
+        {
+          "qty": 1,
+          "name": "Scroll of Demonic Research"
+        }
+      ],
       "recipeKey": "DeviledEgg"
     },
     {
@@ -4202,6 +4620,12 @@
       "favor": "CloseFriends",
       "cost": 3132,
       "skillLevel": 40,
+      "itemCosts": [
+        {
+          "qty": 2,
+          "name": "Scroll of Demonic Research"
+        }
+      ],
       "recipeKey": "DemonicRoast"
     },
     {
@@ -4209,6 +4633,12 @@
       "favor": "CloseFriends",
       "cost": 7800,
       "skillLevel": 60,
+      "itemCosts": [
+        {
+          "qty": 3,
+          "name": "Scroll of Demonic Research"
+        }
+      ],
       "recipeKey": "InfernalSoup"
     },
     {
@@ -4216,6 +4646,12 @@
       "favor": "CloseFriends",
       "cost": 13300,
       "skillLevel": 75,
+      "itemCosts": [
+        {
+          "qty": 4,
+          "name": "Scroll of Demonic Research"
+        }
+      ],
       "recipeKey": "AngelFoodCake"
     },
     {
@@ -4223,6 +4659,12 @@
       "favor": "BestFriends",
       "cost": 18300,
       "skillLevel": 85,
+      "itemCosts": [
+        {
+          "qty": 5,
+          "name": "Scroll of Demonic Research"
+        }
+      ],
       "recipeKey": "HumanStylePizzaWithSouls"
     },
     {
@@ -4237,6 +4679,12 @@
       "favor": "??",
       "cost": 0,
       "skillLevel": 60,
+      "itemCosts": [
+        {
+          "qty": 5,
+          "name": "Scroll of Demonic Research"
+        }
+      ],
       "recipeKey": "MaximizedEmerald1"
     },
     {
@@ -4244,6 +4692,12 @@
       "favor": "CloseFriends",
       "cost": 0,
       "skillLevel": 50,
+      "itemCosts": [
+        {
+          "qty": 10,
+          "name": "Scroll of Demonic Research"
+        }
+      ],
       "recipeKey": null
     }
   ],
@@ -5107,7 +5561,7 @@
     },
     {
       "name": "Heavy Shot 4",
-      "favor": "?",
+      "favor": "LikeFamily",
       "cost": 6264,
       "skillLevel": 50,
       "recipeKey": null
@@ -7368,7 +7822,7 @@
     {
       "name": "Unlock Weather Witching Skill Levels 71-80",
       "favor": "Friends",
-      "cost": 200000,
+      "cost": 400000,
       "skillLevel": 70,
       "recipeKey": null
     },
@@ -7588,6 +8042,12 @@
       "favor": "?",
       "cost": 400000,
       "skillLevel": 70,
+      "itemCosts": [
+        {
+          "qty": 3,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -7679,6 +8139,12 @@
       "favor": "?",
       "cost": 50000,
       "skillLevel": 60,
+      "itemCosts": [
+        {
+          "qty": 2,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -7686,6 +8152,12 @@
       "favor": "?",
       "cost": 200000,
       "skillLevel": 70,
+      "itemCosts": [
+        {
+          "qty": 3,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -7742,6 +8214,12 @@
       "favor": "?",
       "cost": 100000,
       "skillLevel": 60,
+      "itemCosts": [
+        {
+          "qty": 2,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -7749,6 +8227,12 @@
       "favor": "?",
       "cost": 300000,
       "skillLevel": 70,
+      "itemCosts": [
+        {
+          "qty": 3,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -7812,6 +8296,12 @@
       "favor": "Friends",
       "cost": 50000,
       "skillLevel": 60,
+      "itemCosts": [
+        {
+          "qty": 2,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -7882,6 +8372,12 @@
       "favor": "?",
       "cost": 50000,
       "skillLevel": 60,
+      "itemCosts": [
+        {
+          "qty": 2,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -7889,6 +8385,12 @@
       "favor": "?",
       "cost": 200000,
       "skillLevel": 70,
+      "itemCosts": [
+        {
+          "qty": 3,
+          "name": "Royal Jelly"
+        }
+      ],
       "recipeKey": null
     },
     {
@@ -8449,6 +8951,155 @@
       "recipeKey": null
     }
   ],
+  "NPC_Fuzzlebun": [
+    {
+      "name": "Unlock Rabbit Skill Levels 81-90",
+      "favor": "Neutral",
+      "cost": 80,
+      "skillLevel": 80,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Rabbit Skill Levels 91-100",
+      "favor": "Comfortable",
+      "cost": 1000000,
+      "skillLevel": 90,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Rabbit Prodigy Potential",
+      "favor": "Neutral",
+      "cost": 300000,
+      "skillLevel": 104,
+      "recipeKey": null
+    },
+    {
+      "name": "Rabbit Scratch 11",
+      "favor": "?",
+      "cost": 69840,
+      "skillLevel": 100,
+      "recipeKey": null
+    },
+    {
+      "name": "Rabbit Scratch 12",
+      "favor": "?",
+      "cost": 84120,
+      "skillLevel": 110,
+      "recipeKey": null
+    },
+    {
+      "name": "Thump 11",
+      "favor": "?",
+      "cost": 76680,
+      "skillLevel": 105,
+      "recipeKey": null
+    },
+    {
+      "name": "Thump 12",
+      "favor": "?",
+      "cost": 92160,
+      "skillLevel": 115,
+      "recipeKey": null
+    },
+    {
+      "name": "Bun-Fu Kick 8",
+      "favor": "?",
+      "cost": 73800,
+      "skillLevel": 103,
+      "recipeKey": null
+    },
+    {
+      "name": "Rabbit's Foot 8",
+      "favor": "?",
+      "cost": 84120,
+      "skillLevel": 110,
+      "recipeKey": null
+    },
+    {
+      "name": "Hare Dash 10",
+      "favor": "?",
+      "cost": 66000,
+      "skillLevel": 97,
+      "recipeKey": null
+    },
+    {
+      "name": "Hare Dash 11",
+      "favor": "?",
+      "cost": 79560,
+      "skillLevel": 107,
+      "recipeKey": null
+    },
+    {
+      "name": "Play Dead 8",
+      "favor": "?",
+      "cost": 82560,
+      "skillLevel": 109,
+      "recipeKey": null
+    },
+    {
+      "name": "Long Ear 7",
+      "favor": "?",
+      "cost": 76680,
+      "skillLevel": 105,
+      "recipeKey": null
+    },
+    {
+      "name": "Carrot Power 8",
+      "favor": "?",
+      "cost": 79560,
+      "skillLevel": 107,
+      "recipeKey": null
+    },
+    {
+      "name": "Snow Hare Mode 11",
+      "favor": "?",
+      "cost": 69840,
+      "skillLevel": 100,
+      "recipeKey": null
+    },
+    {
+      "name": "Snow Hare Mode 12",
+      "favor": "?",
+      "cost": 84120,
+      "skillLevel": 110,
+      "recipeKey": null
+    },
+    {
+      "name": "Bun-Fu Strike 7",
+      "favor": "?",
+      "cost": 76680,
+      "skillLevel": 105,
+      "recipeKey": null
+    },
+    {
+      "name": "Love Tap 8",
+      "favor": "?",
+      "cost": 75240,
+      "skillLevel": 104,
+      "recipeKey": null
+    },
+    {
+      "name": "Bun-Fu Blast 9",
+      "favor": "?",
+      "cost": 76680,
+      "skillLevel": 105,
+      "recipeKey": null
+    },
+    {
+      "name": "Bun-Fu Blast 10",
+      "favor": "?",
+      "cost": 92160,
+      "skillLevel": 115,
+      "recipeKey": null
+    },
+    {
+      "name": "Fuzzlebun's Energy Bar",
+      "favor": "Neutral",
+      "cost": 65,
+      "skillLevel": 65,
+      "recipeKey": "FuzzlebunsEnergyBar"
+    }
+  ],
   "NPC_GeorgeMadler": [
     {
       "name": "Learn Textile Creation",
@@ -8922,7 +9573,7 @@
     },
     {
       "name": "Relentless Hope 3",
-      "favor": "?",
+      "favor": "LikeFamily",
       "cost": 11600,
       "skillLevel": 58,
       "recipeKey": null
@@ -9131,14 +9782,14 @@
   "NPC_Gribburn": [
     {
       "name": "Learn Ancillary Armor Augment Brewing",
-      "favor": "?",
+      "favor": "Comfortable",
       "cost": 1000,
       "skillLevel": 0,
       "recipeKey": null
     },
     {
       "name": "Decompose Helm",
-      "favor": "?",
+      "favor": "Comfortable",
       "cost": 165,
       "skillLevel": 1,
       "recipeKey": "DecomposeHelm"
@@ -9228,6 +9879,360 @@
       "cost": null,
       "skillLevel": null,
       "recipeKey": "LeatherRoll11"
+    }
+  ],
+  "NPC_GuzorHarrison": [
+    {
+      "name": "Charging Fireball",
+      "favor": "Comfortable",
+      "cost": 0,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Exotic Fire Wall Research Level 65",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": "FireMagicFireWalls65"
+    },
+    {
+      "name": "Exotic Fire Wall Research Level 75",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": "FireMagicFireWalls75"
+    },
+    {
+      "name": "Exotic Fire Wall Research Level 85",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": "FireMagicFireWalls85"
+    },
+    {
+      "name": "Scintillating Doom",
+      "favor": "Comfortable",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Fire Magic Skill Levels 81-90",
+      "favor": "Comfortable",
+      "cost": 80,
+      "skillLevel": 80,
+      "recipeKey": null
+    },
+    {
+      "name": "Fire Magic Research Level 85",
+      "favor": "?",
+      "cost": 85,
+      "skillLevel": 85,
+      "recipeKey": "FireMagic85"
+    },
+    {
+      "name": "Fire Magic Research Level 90",
+      "favor": "?",
+      "cost": 90,
+      "skillLevel": 90,
+      "recipeKey": "FireMagic90"
+    },
+    {
+      "name": "Scintillating Doom 2",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Fire Magic Skill Levels 91-100",
+      "favor": "Neutral",
+      "cost": 90,
+      "skillLevel": 90,
+      "recipeKey": null
+    },
+    {
+      "name": "Fire Magic Research Level 95",
+      "favor": "?",
+      "cost": 95,
+      "skillLevel": 95,
+      "recipeKey": "FireMagic95"
+    },
+    {
+      "name": "Exotic Fire Wall Research Level 95",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": "FireMagicFireWalls95"
+    },
+    {
+      "name": "Fire Magic Research Level 100",
+      "favor": "?",
+      "cost": 100,
+      "skillLevel": 100,
+      "recipeKey": "FireMagic100"
+    },
+    {
+      "name": "Scintillating Doom 3",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Fire Magic Research Level 105",
+      "favor": "?",
+      "cost": 100,
+      "skillLevel": 100,
+      "recipeKey": "FireMagic105"
+    },
+    {
+      "name": "Exotic Fire Wall Research Level 105",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": "FireMagicFireWalls105"
+    },
+    {
+      "name": "Fire Magic Research Level 110",
+      "favor": "?",
+      "cost": 100,
+      "skillLevel": 100,
+      "recipeKey": "FireMagic110"
+    },
+    {
+      "name": "Scintillating Doom 4",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Fire Magic Research Level 115",
+      "favor": "?",
+      "cost": 100,
+      "skillLevel": 100,
+      "recipeKey": "FireMagic115"
+    },
+    {
+      "name": "Exotic Fire Wall Research Level 115",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": "FireMagicFireWalls115"
+    },
+    {
+      "name": "Unlock Fire Magic Prodigy Potential",
+      "favor": "Neutral",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    }
+  ],
+  "NPC_Hamilton": [
+    {
+      "name": "Unlock Pig Skill Levels 81-90",
+      "favor": "Neutral",
+      "cost": 80,
+      "skillLevel": 80,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Pig Skill Levels 91-100",
+      "favor": "Neutral",
+      "cost": 90,
+      "skillLevel": 90,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Pig Prodigy Potential",
+      "favor": "Neutral",
+      "cost": 104,
+      "skillLevel": 104,
+      "recipeKey": null
+    },
+    {
+      "name": "Pig Bite 11",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Pig Bite 12",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Truffle Sniff 11",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Grunt of Abeyance 10",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Grunt of Abeyance 11",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Pig Rend 7",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Frenzy 9",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Frenzy 10",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Strategic Chomp 7",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Strategic Chomp 8",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Strategic Chomp 9",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Pig Punt 7",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Pig Punt 8",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Squeal 7",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Squeal 8",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Mudbath 7",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Mudbath 8",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Porcine Alertness 5",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Survival Instincts Skill Levels 81-90",
+      "favor": "Neutral",
+      "cost": 80,
+      "skillLevel": 80,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Survival Instincts Skill Levels 91-100",
+      "favor": "Neutral",
+      "cost": 90,
+      "skillLevel": 90,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Survival Instincts Prodigy Potential",
+      "favor": "Neutral",
+      "cost": 104,
+      "skillLevel": 104,
+      "recipeKey": null
+    },
+    {
+      "name": "Toughen Up 11",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Toughen Up 12",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Lend Grace 6",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Toxic Flesh 11",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
+    },
+    {
+      "name": "Toxic Flesh 12",
+      "favor": "?",
+      "cost": null,
+      "skillLevel": null,
+      "recipeKey": null
     }
   ],
   "NPC_HemmitMagmagrip": [
@@ -9880,7 +10885,7 @@
     },
     {
       "name": "Shaman's Mind Ring Infusion",
-      "favor": "?",
+      "favor": "LikeFamily",
       "cost": 4766,
       "skillLevel": 49,
       "recipeKey": "ShamanicRingMentalismBaseDmg3"
@@ -9901,7 +10906,7 @@
     },
     {
       "name": "Shaman's Healthy Neck Infusion",
-      "favor": "?",
+      "favor": "LikeFamily",
       "cost": 4800,
       "skillLevel": 50,
       "recipeKey": "ShamanicNecklaceHealthWave3"
@@ -13667,7 +14672,7 @@
     {
       "name": "String (from Spiderweb)",
       "favor": "Friends",
-      "cost": 13,
+      "cost": 900,
       "skillLevel": 13,
       "recipeKey": "StringB"
     },
@@ -13707,6 +14712,13 @@
       "recipeKey": "FineCheesecloth"
     },
     {
+      "name": "Spider Silk",
+      "favor": "Friends",
+      "cost": 965,
+      "skillLevel": null,
+      "recipeKey": "SpiderSilk"
+    },
+    {
       "name": "Strong Spider Silk",
       "favor": "BestFriends",
       "cost": null,
@@ -13716,15 +14728,29 @@
     {
       "name": "Extreme Spider Silk",
       "favor": "LikeFamily",
-      "cost": 35,
+      "cost": 2965,
       "skillLevel": 35,
       "recipeKey": "ExtremeSpiderSilk"
     },
     {
-      "name": "Carded Cotton (Master Level)",
-      "favor": "?",
-      "cost": null,
+      "name": "Incredible Spider Silk",
+      "favor": "LikeFamily",
+      "cost": 4632,
+      "skillLevel": 45,
+      "recipeKey": "IncredibleSpiderSilk"
+    },
+    {
+      "name": "Carded Cotton (Expert Level)",
+      "favor": "BestFriends",
+      "cost": 4632,
       "skillLevel": null,
+      "recipeKey": "CardedCottonExpertLevel"
+    },
+    {
+      "name": "Carded Cotton (Master Level)",
+      "favor": "LikeFamily",
+      "cost": 45,
+      "skillLevel": 45,
       "recipeKey": "CardedCottonMasterLevel"
     },
     {
@@ -13771,21 +14797,21 @@
     },
     {
       "name": "Decent Spider Casing (Enchanted)",
-      "favor": "?",
+      "favor": "CloseFriends",
       "cost": null,
       "skillLevel": null,
       "recipeKey": "CraftedSpiderChest4E"
     },
     {
       "name": "Nice Spider Casing (Enchanted)",
-      "favor": "?",
+      "favor": "CloseFriends",
       "cost": null,
       "skillLevel": null,
       "recipeKey": "CraftedSpiderChest5E"
     },
     {
       "name": "Nice Spider Casing (Max-Enchanted)",
-      "favor": "?",
+      "favor": "CloseFriends",
       "cost": null,
       "skillLevel": null,
       "recipeKey": "CraftedSpiderChest5EM"
@@ -17076,29 +18102,43 @@
       "recipeKey": null
     },
     {
+      "name": "Unlock Saddlery Skill Levels 51-60",
+      "favor": "?",
+      "cost": 20000,
+      "skillLevel": 50,
+      "recipeKey": null
+    },
+    {
+      "name": "Unlock Saddlery Skill Levels 61-70",
+      "favor": "?",
+      "cost": 50000,
+      "skillLevel": 60,
+      "recipeKey": null
+    },
+    {
       "name": "Rough Reins",
-      "favor": "???",
+      "favor": "Comfortable",
       "cost": 11,
       "skillLevel": 11,
       "recipeKey": "StandardReins2"
     },
     {
       "name": "Crude Reins",
-      "favor": "???",
+      "favor": "Friends",
       "cost": 1400,
       "skillLevel": 21,
       "recipeKey": "StandardReins3"
     },
     {
       "name": "Decent Reins",
-      "favor": "???",
+      "favor": "Friends",
       "cost": 2700,
       "skillLevel": 31,
       "recipeKey": "StandardReins4"
     },
     {
       "name": "Nice Reins",
-      "favor": "???",
+      "favor": "CloseFriends",
       "cost": 4300,
       "skillLevel": 41,
       "recipeKey": "StandardReins5"
@@ -17126,28 +18166,28 @@
     },
     {
       "name": "Rough Saddle",
-      "favor": "???",
+      "favor": "Comfortable",
       "cost": 1000,
       "skillLevel": 13,
       "recipeKey": "StandardSaddle2"
     },
     {
       "name": "Crude Saddle",
-      "favor": "???",
+      "favor": "Friends",
       "cost": 1500,
       "skillLevel": 23,
       "recipeKey": "StandardSaddle3"
     },
     {
       "name": "Decent Saddle",
-      "favor": "???",
+      "favor": "Friends",
       "cost": 2800,
       "skillLevel": 33,
       "recipeKey": "StandardSaddle4"
     },
     {
       "name": "Nice Saddle",
-      "favor": "???",
+      "favor": "CloseFriends",
       "cost": 4400,
       "skillLevel": 43,
       "recipeKey": "StandardSaddle5"
@@ -17175,28 +18215,28 @@
     },
     {
       "name": "Rough Saddlebag",
-      "favor": "???",
+      "favor": "Comfortable",
       "cost": 1000,
       "skillLevel": 14,
       "recipeKey": "MundaneSaddlebag2"
     },
     {
       "name": "Crude Saddlebag",
-      "favor": "???",
+      "favor": "Friends",
       "cost": 1500,
       "skillLevel": 24,
       "recipeKey": "MundaneSaddlebag3"
     },
     {
       "name": "Decent Saddlebag",
-      "favor": "???",
+      "favor": "Friends",
       "cost": 2800,
       "skillLevel": 34,
       "recipeKey": "MundaneSaddlebag4"
     },
     {
       "name": "Nice Saddlebag",
-      "favor": "???",
+      "favor": "CloseFriends",
       "cost": 4400,
       "skillLevel": 44,
       "recipeKey": "MundaneSaddlebag5"
@@ -17964,14 +19004,14 @@
     },
     {
       "name": "Astral Strike 4",
-      "favor": "???",
+      "favor": "CloseFriends",
       "cost": 11700,
       "skillLevel": 60,
       "recipeKey": null
     },
     {
       "name": "Fae Conduit 5",
-      "favor": "???",
+      "favor": "CloseFriends",
       "cost": 11700,
       "skillLevel": 60,
       "recipeKey": null
@@ -17985,14 +19025,14 @@
     },
     {
       "name": "Fairy Fire 7",
-      "favor": "???",
+      "favor": "BestFriends",
       "cost": 14750,
       "skillLevel": 61,
       "recipeKey": null
     },
     {
       "name": "Pixie Flare 7",
-      "favor": "???",
+      "favor": "BestFriends",
       "cost": 14900,
       "skillLevel": 64,
       "recipeKey": null
@@ -18325,7 +19365,7 @@
     },
     {
       "name": "Unlock Priest Skill Levels 71-80",
-      "favor": "?",
+      "favor": "Comfortable",
       "cost": 400000,
       "skillLevel": 70,
       "recipeKey": null
@@ -18704,7 +19744,7 @@
     },
     {
       "name": "Quality Malice Orb (Max-Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 22800,
       "skillLevel": 53,
       "recipeKey": "CraftedNecromancyOrb6M"
@@ -18718,7 +19758,7 @@
     },
     {
       "name": "Quality Scintillating Orb (Max-Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 22800,
       "skillLevel": 53,
       "recipeKey": "CraftedScintillatingOrb6M"
@@ -18732,7 +19772,7 @@
     },
     {
       "name": "Quality Searing Orb (Max-Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 22800,
       "skillLevel": 53,
       "recipeKey": "CraftedFireOrb6M"
@@ -18746,14 +19786,14 @@
     },
     {
       "name": "Quality Mind Focus (Max-Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 22800,
       "skillLevel": 53,
       "recipeKey": "CraftedMindFocus6M"
     },
     {
       "name": "Empty Basic Wine Bottle",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 28080,
       "skillLevel": 60,
       "recipeKey": "WineBottle3"
@@ -20995,7 +22035,7 @@
     },
     {
       "name": "Unlock Sword Prodigy Potential",
-      "favor": "Neutral",
+      "favor": "LikeFamily",
       "cost": 276000,
       "skillLevel": 104,
       "recipeKey": null
@@ -21163,7 +22203,7 @@
     },
     {
       "name": "Unlock Shield Prodigy Potential",
-      "favor": "Neutral",
+      "favor": "LikeFamily",
       "cost": 104,
       "skillLevel": 104,
       "recipeKey": null
@@ -22940,6 +23980,13 @@
       "cost": 11465,
       "skillLevel": 70,
       "recipeKey": "RepairTransmutationDamage5"
+    },
+    {
+      "name": "Repair Transmutation Damage: Mastercrafted",
+      "favor": "LikeFamily",
+      "cost": 11465,
+      "skillLevel": 70,
+      "recipeKey": "RepairTransmutationDamage_Mastercrafted"
     }
   ],
   "NPC_Sourgum": [
@@ -23208,14 +24255,14 @@
   "NPC_Squidlips": [
     {
       "name": "Unlock Angling Skill Levels 51-70",
-      "favor": "CloseFriends",
+      "favor": "Comfortable",
       "cost": 18200,
       "skillLevel": 50,
       "recipeKey": null
     },
     {
       "name": "Unlock Angling Skill Levels 61-70",
-      "favor": "?",
+      "favor": "Comfortable",
       "cost": 45500,
       "skillLevel": 60,
       "recipeKey": null
@@ -23341,7 +24388,7 @@
     },
     {
       "name": "Amberjack Fillet",
-      "favor": "Comfortable",
+      "favor": "Friends",
       "cost": 5380,
       "skillLevel": 65,
       "recipeKey": "AmberjackFillet"
@@ -24474,14 +25521,14 @@
     },
     {
       "name": "Crude Wooden Cow Shoes (Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 1566,
       "skillLevel": 23,
       "recipeKey": "CraftedWoodenCowShoes3"
     },
     {
       "name": "Decent Wooden Cow Shoes (Enchanted)",
-      "favor": "?",
+      "favor": "CloseFriends",
       "cost": 2900,
       "skillLevel": 33,
       "recipeKey": "CraftedWoodenCowShoes4"
@@ -24516,14 +25563,14 @@
     },
     {
       "name": "Crude Wooden Deer Shoes (Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 1566,
       "skillLevel": 23,
       "recipeKey": "CraftedWoodenDeerShoes3"
     },
     {
       "name": "Decent Wooden Cow Shoes (Enchanted)",
-      "favor": "?",
+      "favor": "CloseFriends",
       "cost": 2900,
       "skillLevel": 33,
       "recipeKey": "CraftedWoodenCowShoes4"
@@ -24579,14 +25626,14 @@
     },
     {
       "name": "Crude Club (Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 1566,
       "skillLevel": 23,
       "recipeKey": "CraftedClub3E"
     },
     {
       "name": "Decent Club (Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 2900,
       "skillLevel": 33,
       "recipeKey": "CraftedClub4E"
@@ -24641,11 +25688,11 @@
       "recipeKey": "CraftedClub8E"
     },
     {
-      "name": "Amazing Club (Max-Encahted)",
+      "name": "Amazing Club (Max-Enchanted)",
       "favor": "?",
       "cost": 13233,
       "skillLevel": 73,
-      "recipeKey": null
+      "recipeKey": "CraftedClub8EM"
     },
     {
       "name": "Shoddy Melee Staff",
@@ -24684,7 +25731,7 @@
     },
     {
       "name": "Crude Melee Staff (Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 1566,
       "skillLevel": 23,
       "recipeKey": "CraftedMeleeStaff3E"
@@ -24754,14 +25801,14 @@
     },
     {
       "name": "Crude Combat Staff",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 1133,
       "skillLevel": 20,
       "recipeKey": "CraftedCombatStaff3"
     },
     {
       "name": "Crude Combat Staff (Enchanted)",
-      "favor": "?",
+      "favor": "Friends",
       "cost": 1566,
       "skillLevel": 23,
       "recipeKey": "CraftedCombatStaff3E"

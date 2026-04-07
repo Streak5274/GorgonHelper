@@ -2581,6 +2581,13 @@ function buildFavorTrainingPanel(npcKey, chars) {
       const fc = FAVOR_COLORS[e.favor] || FAVOR_COLORS.Neutral;
       const favorLabel = FAVOR_LABELS[e.favor] || e.favor || '?';
       const costStr = e.cost != null ? `<span style="color:var(--gold-dim);font-size:10px;margin-left:6px">${e.cost.toLocaleString()} 🪙</span>` : '';
+      const itemCostStr = (e.itemCosts || []).map(ic => {
+        const itemId = ITEMS_BY_NAME[ic.name.toLowerCase()];
+        const iconId = itemId ? ITEMS_ICONS[itemId] : null;
+        const iconUrl = iconId ? getIconUrl(iconId) : null;
+        const iconHtml = iconUrl ? `<img src="${iconUrl}" style="width:14px;height:14px;vertical-align:middle;image-rendering:pixelated;margin-right:2px">` : '';
+        return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:10px;margin-left:6px;color:var(--text-dim)">${ic.qty}×${iconHtml}<span style="color:var(--text)">${ic.name}</span></span>`;
+      }).join('');
       const lvlStr = e.skillLevel != null ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">Lv.${e.skillLevel}</span>` : '';
 
       // Learned indicator (only for recipe entries)
@@ -2605,6 +2612,7 @@ function buildFavorTrainingPanel(npcKey, chars) {
         <span style="font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.name}</span>${kwTag}
         <span style="flex:1"></span>
         ${lvlStr}
+        ${itemCostStr}
         ${costStr}
         ${favorBadge}
       </div>`;
