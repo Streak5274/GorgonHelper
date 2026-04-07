@@ -1194,16 +1194,23 @@ class SurveyServer:
         }))
 
     def _on_circle_pin(self, cx: int, cy: int):
-        # Wake auto-use loop if it's waiting for the map to detect this pin
+        # Remember whether a click flow is actively waiting for this pin BEFORE
+        # setting the event — used below to decide who advances the scan slot.
+        active_wait = self._auto_use_pin_event is not None
+        # Wake auto-use loop / single-use / manual-click flow if it's waiting
         if self._auto_use_pin_event and not self._auto_use_pin_event.is_set():
             self._auto_use_pin_event.set()
         # If a previous pin timed out and left an error indicator, clear it now —
         # the circle eventually appeared so the slot position will be recorded.
         if self.inv_overlay._error_slot is not None:
             self.inv_overlay.set_error_slot(None)
-            # Advance scan slot past the recovered slot so auto-use can resume correctly
-            self._current_scan_slot = self.inv_overlay._current_slot + 1
-            self.inv_overlay.set_current_slot(self._current_scan_slot)
+            # Only advance the scan slot when no click flow is tracking this pin.
+            # If active_wait is True, _on_survey_detected will increment via the
+            # normal chat-log path — advancing here too would double-count and
+            # skip the next survey slot.
+            if not active_wait:
+                self._current_scan_slot = self.inv_overlay._current_slot + 1
+                self.inv_overlay.set_current_slot(self._current_scan_slot)
             asyncio.ensure_future(self.broadcast({
                 "type": "status",
                 "message": f"✓ Circle detected — slot {self.inv_overlay._current_slot + 1} recovered. Press hotkey to continue.",
