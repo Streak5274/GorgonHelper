@@ -727,6 +727,14 @@ class SurveyServer:
         log.debug("CLICK     slot=%d  pending=%s",
                   slot_index,
                   f"#{self._pending_visit_loc.id}" if self._pending_visit_loc else "none")
+
+        # Setup mode: user manually double-clicked a survey — watch for circle pin.
+        if self._surveying and not self._setup_complete and not self._auto_use_active:
+            if slot_index == self._current_scan_slot:
+                log.debug("CLICK     setup mode slot=%d, watching for circle pin", slot_index)
+                await self._check_pin_after_click(slot_index)
+            return
+
         if self._pending_visit_loc is not None:
             log.debug("CLICK     slot=%d ignored — pending already set", slot_index)
             return
@@ -927,6 +935,36 @@ class SurveyServer:
         x, y = self._slot_screen_center(slot)
         log.debug("SINGLE-USE  clicking slot %d at (%d, %d)", slot, x, y)
         self._simulate_double_click(x, y)
+
+        # In setup mode, wait for the map OCR to detect the circle pin and mark
+        # the slot red if it doesn't appear — same behaviour as auto-use.
+        if not self._setup_complete:
+            await self._check_pin_after_click(slot)
+
+    async def _check_pin_after_click(self, slot: int, timeout: float = 8.0):
+        """After using a survey in setup mode, wait for map OCR circle detection.
+
+        If the circle isn't detected within *timeout* seconds, mark the inventory
+        slot red so the user knows OCR failed.  Clears any previous error first.
+        This mirrors the same logic inside _auto_use_surveys so all three entry
+        points (auto-use, single-use hotkey, manual double-click) behave the same.
+        """
+        self.inv_overlay.set_error_slot(None)
+        self._auto_use_pin_event = asyncio.Event()
+        try:
+            await asyncio.wait_for(self._auto_use_pin_event.wait(), timeout=timeout)
+            log.debug("SINGLE-USE  circle pin detected for slot %d", slot)
+        except asyncio.TimeoutError:
+            log.warning("SINGLE-USE  pin timeout at slot %d — map OCR didn't detect circle", slot)
+            self._current_scan_slot = slot
+            self.inv_overlay.set_current_slot(slot)
+            self.inv_overlay.set_error_slot(slot)
+            await self.broadcast({
+                "type": "status",
+                "message": f"⚠ Map circle not detected at slot {slot + 1} — check map region or wait for it to appear.",
+            })
+        finally:
+            self._auto_use_pin_event = None
 
     async def _auto_use_surveys(self):
         """Simulate double-clicking each survey slot in sequence until timeout."""
